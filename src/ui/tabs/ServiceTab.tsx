@@ -1,20 +1,22 @@
-import { BANKRUPTCY_GRACE_WEEKS, REPAIR_RATE, equipmentType } from '../../sim/catalog';
+import { BANKRUPTCY_GRACE_WEEKS, CLOSE_HOUR, OPEN_HOUR, REPAIR_RATE, equipmentType } from '../../sim/catalog';
+import { formatTime } from '../../sim/clock';
 import { incidentDef, incidentStaff } from '../../sim/incidents';
-import { readiness, serviceCapacity } from '../../sim/store';
+import { isWorking, readiness, serviceCapacity } from '../../sim/store';
 import { AlertIcon, CheckIcon, CircleIcon } from '../Icons';
-import { Card, Meter, Money, Stat, plural, when } from '../bits';
-import { useGameUi, type TabId } from '../context';
+import { Card, Money, Stat, plural, when } from '../bits';
+import { useGameUi } from '../context';
 
-export function StoreTab({ saveError }: { saveError: string | null }) {
-  const { state, act, goTo } = useGameUi();
+export function ServiceTab({ saveError }: { saveError: string | null }) {
+  const { state, act, goTo, openSheet } = useGameUi();
   const ready = readiness(state);
   const broken = state.store.equipment.filter((e) => e.broken);
   const today = state.today;
-  const checklist: { done: boolean; label: string; tab: TabId }[] = [
-    { done: ready.register, label: 'Install a cash register', tab: 'build' },
-    { done: ready.drinkMachine, label: 'Install a coffee machine', tab: 'build' },
-    { done: ready.barista, label: 'Hire a barista', tab: 'staff' },
-    { done: ready.menu, label: 'Put a drink on the menu', tab: 'menu' },
+  const working = state.staff.filter((s) => isWorking(s, state.hour)).length;
+  const checklist: { done: boolean; label: string; go: () => void }[] = [
+    { done: ready.register, label: 'Install a cash register', go: () => openSheet('customize') },
+    { done: ready.drinkMachine, label: 'Install a coffee machine', go: () => openSheet('customize') },
+    { done: ready.barista, label: 'Hire a barista', go: () => openSheet('staff') },
+    { done: ready.menu, label: 'Put a drink on the menu', go: () => goTo('product') },
   ];
 
   return (
@@ -31,18 +33,19 @@ export function StoreTab({ saveError }: { saveError: string | null }) {
           <span>
             Cash is below zero. You have {plural(BANKRUPTCY_GRACE_WEEKS - state.distressWeeks + 1, 'week')} to recover before the company goes bankrupt.
           </span>
-          <button className="btn btn-small" onClick={() => goTo('finance')}>Bank</button>
+          <button className="btn btn-small" onClick={() => goTo('finance')}>
+            Bank
+          </button>
         </div>
       )}
       {broken.map((e) => {
         const t = equipmentType(e.typeId);
-        const cost = Math.round(t.cost * REPAIR_RATE);
         return (
           <div className="alert warn" role="alert" key={e.id}>
             <AlertIcon />
             <span>The {t.name} is broken. Drinks that need it are off the menu.</span>
             <button className="btn btn-small btn-primary" onClick={() => act({ type: 'repairEquipment', equipmentId: e.id })}>
-              Repair <Money cents={cost} />
+              Repair <Money cents={Math.round(t.cost * REPAIR_RATE)} />
             </button>
           </div>
         );
@@ -56,7 +59,7 @@ export function StoreTab({ saveError }: { saveError: string | null }) {
                 {c.done ? <CheckIcon /> : <CircleIcon />}
                 <span>{c.label}</span>
                 {!c.done && (
-                  <button className="btn btn-small" onClick={() => goTo(c.tab)}>
+                  <button className="btn btn-small" onClick={c.go}>
                     Go
                   </button>
                 )}
@@ -112,28 +115,14 @@ export function StoreTab({ saveError }: { saveError: string | null }) {
           </Stat>
           <Stat label="Team capacity">{Math.floor(serviceCapacity(state))}/h</Stat>
         </div>
-        {state.lastHour && state.lastHour.demand > state.lastHour.served && (
-          <p className="muted small">
-            Last hour {state.lastHour.demand} people wanted coffee and {state.lastHour.served} were served. More baristas or a faster machine would help.
-          </p>
-        )}
-      </Card>
-
-      <Card title="Reputation">
-        <div className="meter-row">
-          <span>Reputation</span>
-          <Meter value={state.store.reputation} label="Reputation" />
-          <span className="num">{Math.round(state.store.reputation)}</span>
-        </div>
-        <div className="meter-row">
-          <span>Satisfaction</span>
-          <Meter value={state.store.satisfaction} label="Customer satisfaction" />
-          <span className="num">{Math.round(state.store.satisfaction)}</span>
-        </div>
         <p className="muted small">
-          Satisfaction comes from drink quality, fair prices, short lines, and a nice room. Reputation drifts toward it each day, and more
-          reputation brings more people through the door.
+          Open {formatTime(OPEN_HOUR)} to {formatTime(CLOSE_HOUR)} every day. {working} of {state.staff.length} staff working now.
         </p>
+        <div className="row-actions">
+          <button className="btn btn-small" onClick={() => openSheet('staff')}>
+            Manage staff
+          </button>
+        </div>
       </Card>
 
       <Card title="Activity">

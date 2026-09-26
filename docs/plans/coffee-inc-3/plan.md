@@ -17,6 +17,14 @@ Goals, in priority order:
 - Art style: **keep Coffee Inc 2's look** (clean isometric cafe, warm materials, simple charming characters, dashboard-style finance screens).
 - Phase 2: owner delegated the choice. Chosen: **"Grow to a local chain"** (see Phase 2), because scaling past one store is the next thing a single-store player wants, and it forces the two systems Coffee Inc 2 got most wrong at scale (delegated managers and custom layouts) to be built right before anything bigger sits on top of them.
 
+**2026-09-26 (owner review of the first build): "doesn't really look like Coffee Inc 2"**
+- Reference: the six official App Store screenshots (city maps of New York and London, the store view, HQ marketing and finance, the investment bank).
+- The UI moves to Coffee Inc 2's layout and look: a dark theme per location (espresso brown for stores), the city map as the home screen with translucent chips and rounded-square pins, a store screen with a centered header, a staff dialogue band over the scene, rust rounded-square Staff and Customize buttons, CUSTOMER REVIEWS with Price / Product / Service / Atmosphere stars, and Service · Product · Marketing · Finance tabs with illustrated icons. Finance follows the HQ screen: big revenue and net income numbers, bars, segmented statement views, and two-period tables.
+- The store scene now sits on a street corner (sidewalk, crosswalks, cars, passersby, building fronts behind) with brick walls, light oak floors, and navy chairs.
+- Pulled forward from Phase 2 because they are part of the store screen: the six toggle marketing campaigns (Task 2.4) and customer reviews. Events now pop up and pause the clock, as in Coffee Inc 2.
+- All art stays original: no elephant logo, no "Blue Elephant Cafe", none of Side Labs' assets. Players pick their own logo and brand color.
+- Save format moves to version 2, with a migration from version 1.
+
 **Defaults applied to the still-open questions** (easy to change later, none block the MVP):
 - Monetization: none in the MVP. Revisit before launch; no pay-to-win either way.
 - Save/sync: local-only (IndexedDB) plus JSON export/import. Account-based cloud save stays a later phase.
@@ -148,7 +156,7 @@ Dependencies: 0.1, 0.3.
 **Task 2.1 — Store manager FSM** (fixes bug #7): hire a manager per store; explicit states (Staffing, Operating, Restocking, NeedsAttention), self-healing invariant checks every tick, UI badge when a store needs you.
 **Task 2.2 — Custom interior editor** (fixes bug #2): drag-to-place on the isometric grid, schema-validated layout, per-item error boundaries, layout affects flow and seating.
 **Task 2.3 — Multiple stores in the first city**: isometric city map with lots to lease, per-store P&L rolled up into company statements, store switcher.
-**Task 2.4 — Marketing basics**: local campaigns (flyers, social, loyalty card) with a measurable, honest effect on traffic.
+**Task 2.4 — Marketing basics**: done early (see the decisions log). Six toggle campaigns with weekly costs and stated effects on traffic, reputation, and atmosphere.
 **Task 2.5 — One rival cafe chain** (pulled forward from Phase 4.1): a single AI competitor in the city that reacts to your prices, so growth has real tension.
 
 Moved to Phase 3: multi-city expansion with the per-city regional rules table (fixes bug #8), and HQ departments.

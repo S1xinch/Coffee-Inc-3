@@ -1,12 +1,16 @@
 # Coffee-Inc-3
 
-A coffee shop business sim that runs as an installable web app on iPhone and iPad (Safari, Add to Home Screen). Phase 1: one store, real bookkeeping, and offline progress.
+A coffee shop business sim that runs as an installable web app on iPhone and iPad (Safari, Add to Home Screen), laid out like Coffee Inc 2. Phase 1: one store, real bookkeeping, and offline progress.
+
+Play it at https://s1xinch.github.io/Coffee-Inc-3/ (deployed from `main` by GitHub Pages).
 
 ## What's in the game right now
 
-- Pick one of three neighborhoods. Each has its own foot traffic, rent, and price sensitivity.
+- An isometric city map as the home screen, with your store's pin and lots for lease.
+- Pick a logo, a brand color, and one of three neighborhoods. Each neighborhood has its own foot traffic, rent, and price sensitivity.
+- A store screen with your staff talking to you, the café on its street corner, customer reviews (price, product, service, atmosphere), and Service, Product, Marketing, and Finance tabs.
 - Buy and upgrade counter equipment, seating, and decor. They all show up in the isometric store view.
-- Set menu prices, hire and train baristas, and handle random incidents. Anything you ignore is settled automatically when its deadline passes.
+- Set menu prices, hire and train baristas, run six marketing campaigns, and handle events that pop up. Anything you ignore is settled automatically when its deadline passes.
 - Double-entry books with a weekly income statement, balance sheet, cash flow statement, and bank loans.
 - Offline progress. Time away counts as one game day per real hour, capped at two game weeks, and you get a summary when you come back.
 - Saves to IndexedDB automatically, with export and import to a JSON file.
@@ -29,9 +33,9 @@ If Playwright can't find its bundled Chromium, set `PW_CHROMIUM_PATH` to a Chrom
 
 ## Layout
 
-- `src/sim`: the framework-free, deterministic simulation (ledger, demand, staff, incidents, weekly close, saves)
+- `src/sim`: the framework-free, deterministic simulation (ledger, demand, staff, incidents, marketing, reviews, weekly close, saves)
 - `src/worker`: the Web Worker that runs the game clock off the UI thread
-- `src/render`: the Canvas 2D isometric store renderer
+- `src/render`: the Canvas 2D isometric store and city renderers
 - `src/ui`: the React screens and tabs
 - `src/persistence`: IndexedDB saves, backups, and export/import
 - `public`: icons, splash screens, and the privacy and terms pages

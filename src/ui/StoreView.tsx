@@ -5,9 +5,11 @@ import type { GameState } from '../sim/state';
 import { isOpenHour, isWorking, readiness } from '../sim/store';
 import { StoreScene, type SceneModel } from '../render/scene';
 
-export function SceneCanvas({ model, label }: { model: SceneModel; label: string }) {
+export function SceneCanvas({ model, label, insetTop = 0 }: { model: SceneModel; label: string; insetTop?: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const scene = useRef<StoreScene | null>(null);
+  const latest = useRef(model);
+  latest.current = model;
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -15,12 +17,13 @@ export function SceneCanvas({ model, label }: { model: SceneModel; label: string
     if (!el) return;
     let s: StoreScene;
     try {
-      s = new StoreScene(el);
+      s = new StoreScene(el, { insetTop });
     } catch {
       setFailed(true);
       return;
     }
     scene.current = s;
+    s.setModel(latest.current);
     const ro = new ResizeObserver(([entry]) => {
       if (entry) s.resize(entry.contentRect.width, entry.contentRect.height, window.devicePixelRatio || 1);
     });
@@ -31,7 +34,7 @@ export function SceneCanvas({ model, label }: { model: SceneModel; label: string
       s.stop();
       scene.current = null;
     };
-  }, []);
+  }, [insetTop]);
 
   useEffect(() => {
     scene.current?.setModel(model);
@@ -59,10 +62,11 @@ export function StoreView({ state, speed }: { state: GameState; speed: Speed }) 
       servedLastHour: served,
       speed,
       companyName: state.companyName,
+      brandColor: state.brand.color,
     }),
     // Keys stand in for the arrays so the scene only updates when something visible changes.
-    [equipmentKey, baristaKey, serving, hourOfDay, served, speed, state.companyName],
+    [equipmentKey, baristaKey, serving, hourOfDay, served, speed, state.companyName, state.brand.color],
   );
 
-  return <SceneCanvas model={model} label={`Isometric view of ${state.companyName}`} />;
+  return <SceneCanvas model={model} label={`Isometric view of ${state.companyName}`} insetTop={44} />;
 }

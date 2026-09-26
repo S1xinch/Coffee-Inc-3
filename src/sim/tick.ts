@@ -11,6 +11,7 @@ import { simulateHourSales } from './demand';
 import { autoResolveOverdue, maybeRollIncident } from './incidents';
 import { balanceSheet, cashFlow, foldJournal, incomeStatement, post } from './ledger';
 import { addLog } from './log';
+import { marketingAtmosphere, marketingBuzz, perCupCost, weeklyMarketingCost } from './marketing';
 import { formatMoney } from './money';
 import { ambianceMultiplier, isOpenHour, loanBalance, readiness } from './store';
 import { refreshCandidates, updateMoraleAndQuits } from './staff';
@@ -50,6 +51,7 @@ function runOpenHour(state: GameState): void {
   today.lost += sales.lost;
   today.revenue += sales.revenue;
   today.cogs += sales.cogs;
+  today.marketingAccrued += sales.served * perCupCost(state);
   today.qualitySum += sales.qualitySum;
   today.priceRatioSum += sales.priceRatioSum;
   today.capacitySum += sales.capacity;
@@ -62,6 +64,8 @@ function runOpenHour(state: GameState): void {
 
 function endOfDay(state: GameState): void {
   const day = state.today;
+  day.marketingAccrued += Math.round(weeklyMarketingCost(state) / 7);
+  if (day.marketingAccrued > 0) post(state, 'Marketing', 'operating', [['marketing', day.marketingAccrued], ['cash', -day.marketingAccrued]]);
   if (day.wagesAccrued > 0) post(state, 'Wages', 'operating', [['wages', day.wagesAccrued], ['cash', -day.wagesAccrued]]);
   if (day.openHours > 0) {
     post(state, 'Utilities', 'operating', [['utilities', UTILITIES_PER_OPEN_DAY], ['cash', -UTILITIES_PER_OPEN_DAY]]);
@@ -72,13 +76,21 @@ function endOfDay(state: GameState): void {
     const qualityN = day.served > 0 ? clamp01((day.qualitySum / day.served - 0.8) / 0.5) : 0;
     const priceN = day.served > 0 ? clamp01((day.priceRatioSum / day.served - 0.5) / 0.7) : 0;
     const serviceN = clamp01(1 - (day.lost / visitors) * 1.5);
-    const ambianceN = clamp01((ambianceMultiplier(state) - 0.85) / 0.4);
+    const ambianceN = clamp01((ambianceMultiplier(state) - 0.85) / 0.4 + marketingAtmosphere(state));
     const satisfaction = 100 * (0.3 * qualityN + 0.25 * priceN + 0.25 * serviceN + 0.2 * ambianceN);
     state.store.satisfaction = Math.round(satisfaction * 10) / 10;
+    const r = state.store.ratings;
+    const drift = (current: number, today: number) => Math.round((current + (today - current) * 0.25) * 1000) / 1000;
+    r.product = drift(r.product, qualityN);
+    r.price = drift(r.price, priceN);
+    r.service = drift(r.service, serviceN);
+    r.atmosphere = drift(r.atmosphere, ambianceN);
+    state.store.reviews += Math.round(day.served * 0.02);
     const volume = Math.min(1, day.served / 150);
     const rep = state.store.reputation + (satisfaction - state.store.reputation) * 0.08 * volume;
     state.store.reputation = Math.round(Math.min(100, Math.max(0, rep)) * 100) / 100;
   }
+  state.store.reputation = Math.min(100, Math.round((state.store.reputation + marketingBuzz(state)) * 100) / 100);
 
   updateMoraleAndQuits(state, day.capacitySum > 0 ? day.served / day.capacitySum : 0);
   state.yesterday = day;

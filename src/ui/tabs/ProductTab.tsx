@@ -20,8 +20,8 @@ const NEEDS: Record<MenuCategory, string> = {
 
 const STEP = 25;
 
-export function MenuTab() {
-  const { state, act, goTo } = useGameUi();
+export function ProductTab() {
+  const { state, act, openSheet } = useGameUi();
   const sensitivity = neighborhood(state.neighborhoodId).priceSensitivity;
   const sensitivityLabel = sensitivity >= 1.3 ? 'high' : sensitivity <= 0.8 ? 'low' : 'medium';
 
@@ -41,8 +41,8 @@ export function MenuTab() {
             title={CATEGORY_TITLES[category]}
             aside={
               !available && (
-                <button className="btn btn-small" onClick={() => goTo('build')}>
-                  {broken ? 'Repair' : 'Build'}
+                <button className="btn btn-small" onClick={() => openSheet('customize')}>
+                  {broken ? 'Repair' : 'Customize'}
                 </button>
               )
             }

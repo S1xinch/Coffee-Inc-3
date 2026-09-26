@@ -1,19 +1,21 @@
-import { MENU, START_HOUR, STARTING_CAPITAL, neighborhood } from './catalog';
+import { BRAND_COLORS, MENU, START_HOUR, STARTING_CAPITAL, neighborhood } from './catalog';
 import { post } from './ledger';
 import { addLog } from './log';
 import { refreshCandidates } from './staff';
-import { emptyDayStats, type GameState } from './state';
+import { emptyDayStats, type BrandIcon, type GameState } from './state';
 
 export interface NewGameOptions {
   companyName: string;
   neighborhoodId: string;
   seed: number;
+  brand?: { icon: BrandIcon; color: string };
 }
 
-export function newGame({ companyName, neighborhoodId, seed }: NewGameOptions): GameState {
+export function newGame({ companyName, neighborhoodId, seed, brand }: NewGameOptions): GameState {
   neighborhood(neighborhoodId);
   const state: GameState = {
     companyName: companyName.trim().slice(0, 40) || 'My Coffee Co.',
+    brand: brand ?? { icon: 'cup', color: BRAND_COLORS[0] },
     neighborhoodId,
     hour: 0,
     rng: seed >>> 0,
@@ -24,6 +26,9 @@ export function newGame({ companyName, neighborhoodId, seed }: NewGameOptions): 
       menu: Object.fromEntries(MENU.map((m) => [m.id, { enabled: true, price: m.refPrice }])),
       reputation: 20,
       satisfaction: 50,
+      ratings: { price: 0.5, product: 0.5, service: 0.5, atmosphere: 0.5 },
+      reviews: 0,
+      marketing: {},
     },
     staff: [],
     candidates: [],
