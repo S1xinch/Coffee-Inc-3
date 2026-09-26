@@ -34,6 +34,7 @@ export const JournalEntrySchema = z.object({
   memo: z.string(),
   kind: z.enum(['operating', 'investing', 'financing']),
   lines: z.array(JournalLineSchema).min(2),
+  storeId: z.string().nullable(),
 });
 
 export const IncomeStatementSchema = z.object({
@@ -82,6 +83,17 @@ export const WeekReportSchema = z.object({
   customersServed: z.number().int().nonnegative(),
   customersLost: z.number().int().nonnegative(),
   reputation: z.number(),
+  stores: z.array(
+    z.object({
+      storeId: z.string(),
+      lotId: z.string(),
+      revenue: cents,
+      netIncome: cents,
+      served: z.number().int().nonnegative(),
+      lost: z.number().int().nonnegative(),
+      reputation: z.number(),
+    }),
+  ),
 });
 
 export const EquipmentSchema = z.object({
@@ -123,9 +135,11 @@ export const PendingIncidentSchema = z.object({
   createdHour: z.number().int(),
   deadlineHour: z.number().int(),
   staffId: z.string().nullable(),
+  storeId: z.string(),
 });
 
 export const ModifierSchema = z.object({
+  storeId: z.string(),
   kind: z.enum(['supplierCost', 'qualityPenalty', 'trafficBoost']),
   value: z.number(),
   untilHour: z.number().int(),
@@ -162,27 +176,58 @@ export type BrandIcon = (typeof BRAND_ICONS)[number];
 
 const rating = z.number().min(0).max(1);
 
+export const ManagerSchema = z.object({
+  name: z.string(),
+  look: z.number().int().nonnegative(),
+  salary: cents,
+  hiredHour: z.number().int().nonnegative(),
+  lastAction: z.string().nullable(),
+  lastActionHour: z.number().int().nullable(),
+});
+
+export const CellSchema = z.object({ x: z.number().int(), y: z.number().int() });
+
+export const StoreSchema = z.object({
+  id: z.string(),
+  lotId: z.string(),
+  openedHour: z.number().int().nonnegative(),
+  open: z.boolean(),
+  equipment: z.array(EquipmentSchema),
+  layout: z.record(z.string(), CellSchema),
+  menu: z.record(z.string(), MenuEntrySchema),
+  reputation: z.number().min(0).max(100),
+  satisfaction: z.number().min(0).max(100),
+  ratings: z.object({ price: rating, product: rating, service: rating, atmosphere: rating }),
+  reviews: z.number().int().nonnegative(),
+  marketing: z.record(z.string(), z.number().int().nonnegative()),
+  staff: z.array(StaffSchema),
+  manager: ManagerSchema.nullable(),
+  today: DayStatsSchema,
+  yesterday: DayStatsSchema.nullable(),
+  week: z.object({
+    served: z.number().int().nonnegative(),
+    lost: z.number().int().nonnegative(),
+  }),
+  lastHour: HourStatsSchema.nullable(),
+});
+
+export const RivalSchema = z.object({
+  name: z.string(),
+  stores: z.array(z.object({ lotId: z.string(), openedHour: z.number().int().nonnegative() })),
+  priceIndex: z.number().min(0.5).max(2),
+  stars: z.number().min(1).max(5),
+});
+
 export const GameStateSchema = z.object({
   companyName: z.string().min(1).max(40),
   brand: z.object({
     icon: z.enum(BRAND_ICONS),
     color: z.string().regex(/^#[0-9a-f]{6}$/i),
   }),
-  neighborhoodId: z.string(),
   hour: z.number().int().nonnegative(),
   rng: z.number().int().nonnegative(),
   nextId: z.number().int().nonnegative(),
-  store: z.object({
-    open: z.boolean(),
-    equipment: z.array(EquipmentSchema),
-    menu: z.record(z.string(), MenuEntrySchema),
-    reputation: z.number().min(0).max(100),
-    satisfaction: z.number().min(0).max(100),
-    ratings: z.object({ price: rating, product: rating, service: rating, atmosphere: rating }),
-    reviews: z.number().int().nonnegative(),
-    marketing: z.record(z.string(), z.number().int().nonnegative()),
-  }),
-  staff: z.array(StaffSchema),
+  stores: z.array(StoreSchema).min(1),
   candidates: z.array(CandidateSchema),
   ledger: z.object({
     broughtForward: z.record(z.string(), cents),
@@ -195,13 +240,7 @@ export const GameStateSchema = z.object({
   incidents: z.array(PendingIncidentSchema),
   modifiers: z.array(ModifierSchema),
   log: z.array(LogEntrySchema),
-  today: DayStatsSchema,
-  week: z.object({
-    served: z.number().int().nonnegative(),
-    lost: z.number().int().nonnegative(),
-  }),
-  lastHour: HourStatsSchema.nullable(),
-  yesterday: DayStatsSchema.nullable(),
+  rival: RivalSchema,
   lifetime: z.object({
     served: z.number().int().nonnegative(),
     revenue: cents,
@@ -227,6 +266,10 @@ export type LogEntry = z.infer<typeof LogEntrySchema>;
 export type DayStats = z.infer<typeof DayStatsSchema>;
 export type HourStats = z.infer<typeof HourStatsSchema>;
 export type GameState = z.infer<typeof GameStateSchema>;
+export type Store = z.infer<typeof StoreSchema>;
+export type Manager = z.infer<typeof ManagerSchema>;
+export type Cell = z.infer<typeof CellSchema>;
+export type Rival = z.infer<typeof RivalSchema>;
 
 export const emptyDayStats = (): DayStats => ({
   served: 0,

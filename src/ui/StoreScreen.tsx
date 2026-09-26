@@ -1,12 +1,14 @@
-import type { ReactNode } from 'react';
-import { OPEN_HOUR, neighborhood } from '../sim/catalog';
+import { useEffect, useState, type ReactNode } from 'react';
+import { OPEN_HOUR, equipmentType } from '../sim/catalog';
+import { lot } from '../sim/city';
 import { SPEEDS, calendarDate, clockInfo, formatTime, type Speed } from '../sim/clock';
 import { cashBalance } from '../sim/ledger';
 import { formatMoney } from '../sim/money';
-import type { GameState } from '../sim/state';
-import { isOpenHour, readiness } from '../sim/store';
+import { isFloorCell, occupant } from '../sim/layout';
+import type { Cell, GameState, Store } from '../sim/state';
+import { isOpenHour, readiness, storeDistrict } from '../sim/store';
 import { BrandGlyph, Portrait } from './Brand';
-import { CloseIcon, PauseIcon, PlayIcon } from './Icons';
+import { CheckIcon, CloseIcon, PauseIcon, PlayIcon } from './Icons';
 import { Reviews } from './ReviewCard';
 import { StoreView } from './StoreView';
 import { BoxGlyph, FinanceArt, MarketingArt, ProductArt, ServiceArt, StaffGlyph } from './TabIcons';
@@ -36,7 +38,7 @@ export function SpeedControls({ speed, onChange }: { speed: Speed; onChange: (s:
   );
 }
 
-function StageStatus({ state, speed }: { state: GameState; speed: Speed }) {
+function StageStatus({ state, store, speed }: { state: GameState; store: Store; speed: Speed }) {
   const hod = state.hour % 24;
   const c = clockInfo(state.hour);
   let text: string;
@@ -44,17 +46,17 @@ function StageStatus({ state, speed }: { state: GameState; speed: Speed }) {
   if (speed === 0) {
     text = 'Paused';
     tone = 'idle';
-  } else if (!state.store.open) {
+  } else if (!store.open) {
     text = 'Closed by you';
     tone = 'warn';
   } else if (!isOpenHour(hod)) {
     text = `Closed · Opens ${formatTime(OPEN_HOUR)}`;
     tone = 'idle';
-  } else if (!readiness(state).ready) {
+  } else if (!readiness(state, store).ready) {
     text = 'Not ready to open';
     tone = 'warn';
   } else {
-    text = `Open · ${state.lastHour?.served ?? 0} served last hour`;
+    text = `Open · ${store.lastHour?.served ?? 0} served last hour`;
     tone = 'good';
   }
   return (
@@ -76,10 +78,61 @@ interface Props {
   saveError: string | null;
 }
 
+const ArrangeGlyph = () => (
+  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3v18M3 12h18" />
+    <path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />
+  </svg>
+);
+
+function StoreSwitcher() {
+  const { state, store, selectStore } = useGameUi();
+  if (state.stores.length < 2) return null;
+  const i = state.stores.findIndex((s) => s.id === store.id);
+  const go = (d: number) => selectStore(state.stores[(i + d + state.stores.length) % state.stores.length]!.id);
+  return (
+    <div className="store-switch" role="group" aria-label="Switch store">
+      <button className="btn btn-icon" aria-label="Previous store" onClick={() => go(-1)}>
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+          <path d="M15 5l-7 7 7 7" />
+        </svg>
+      </button>
+      <span className="num">
+        {i + 1} of {state.stores.length}
+      </span>
+      <button className="btn btn-icon" aria-label="Next store" onClick={() => go(1)}>
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+          <path d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export function StoreScreen({ tab, onTab, speed, onSpeed, onClose, saveError }: Props) {
-  const { state, openSheet } = useGameUi();
-  const hood = neighborhood(state.neighborhoodId);
-  const line = dialogueLine(state, speed === 0);
+  const { state, store, openSheet, storeAct } = useGameUi();
+  const district = storeDistrict(store);
+  const line = dialogueLine(state, store, speed === 0);
+  const [arranging, setArranging] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const storeIncidents = state.incidents.filter((i) => i.storeId === store.id).length;
+
+  // Switching stores ends arrange mode.
+  useEffect(() => {
+    setArranging(false);
+    setSelected(null);
+  }, [store.id]);
+
+  const onCell = async (cell: Cell) => {
+    const there = occupant(store, cell);
+    if (selected && there !== selected && isFloorCell(cell)) {
+      const ok = await storeAct({ type: 'moveItem', equipmentId: selected, x: cell.x, y: cell.y });
+      if (ok) setSelected(null);
+      return;
+    }
+    setSelected(there && there !== selected ? there : null);
+  };
+  const selectedItem = selected ? store.equipment.find((e) => e.id === selected) : undefined;
 
   return (
     <div className="store-screen">
@@ -88,9 +141,10 @@ export function StoreScreen({ tab, onTab, speed, onSpeed, onClose, saveError }: 
         <div className="store-title">
           <h1>{state.companyName}</h1>
           <p>
-            {hood.address}, {hood.name}
+            {lot(store.lotId).address}, {district.name}
           </p>
           <p className={`store-cash num ${cashBalance(state) < 0 ? 'neg' : ''}`}>{formatMoney(cashBalance(state))} cash</p>
+          <StoreSwitcher />
         </div>
         <button className="close-btn" aria-label="Back to the city map" onClick={onClose}>
           <CloseIcon />
@@ -107,18 +161,40 @@ export function StoreScreen({ tab, onTab, speed, onSpeed, onClose, saveError }: 
               </p>
               <Portrait look={line.speaker.look} size={70} apron={state.brand.color} />
             </div>
-            <StoreView state={state} speed={speed} />
-            <StageStatus state={state} speed={speed} />
-            <button className="fab left" aria-label="Staff" onClick={() => openSheet('staff')}>
-              <StaffGlyph />
-            </button>
-            <SpeedControls speed={speed} onChange={onSpeed} />
-            <button className="fab right" aria-label="Customize" onClick={() => openSheet('customize')}>
-              <BoxGlyph />
-            </button>
+            <StoreView state={state} store={store} speed={speed} arrange={arranging ? { selected, onCell } : null} />
+            {!arranging && <StageStatus state={state} store={store} speed={speed} />}
+            {arranging ? (
+              <div className="arrange-bar">
+                <span>{selectedItem ? `Tap a green square for the ${equipmentType(selectedItem.typeId).name.toLowerCase()}` : 'Tap a gold square to pick it up'}</span>
+                <button
+                  className="btn btn-primary btn-small"
+                  onClick={() => {
+                    setArranging(false);
+                    setSelected(null);
+                  }}
+                >
+                  <CheckIcon /> Done
+                </button>
+              </div>
+            ) : (
+              <>
+                <button className="fab left" aria-label="Staff" onClick={() => openSheet('staff')}>
+                  <StaffGlyph />
+                </button>
+                <SpeedControls speed={speed} onChange={onSpeed} />
+                <button className="fab right" aria-label="Customize" onClick={() => openSheet('customize')}>
+                  <BoxGlyph />
+                </button>
+                {Object.keys(store.layout).length > 0 && (
+                  <button className="fab right2" aria-label="Arrange furniture" onClick={() => setArranging(true)}>
+                    <ArrangeGlyph />
+                  </button>
+                )}
+              </>
+            )}
           </section>
 
-          <Reviews state={state} />
+          <Reviews store={store} />
         </div>
 
         <div className="store-panel" key={tab}>
@@ -134,7 +210,7 @@ export function StoreScreen({ tab, onTab, speed, onSpeed, onClose, saveError }: 
           <button key={t.id} className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => onTab(t.id)}>
             {t.icon}
             <span>{t.label}</span>
-            {t.id === 'service' && state.incidents.length > 0 && <span className="badge">{state.incidents.length}</span>}
+            {t.id === 'service' && storeIncidents > 0 && <span className="badge">{storeIncidents}</span>}
           </button>
         ))}
       </nav>

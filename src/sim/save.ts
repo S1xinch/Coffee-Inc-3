@@ -1,11 +1,14 @@
-import { EQUIPMENT, MENU, NEIGHBORHOODS } from './catalog';
+import { EQUIPMENT, MENU } from './catalog';
+import { LOTS, firstLotIn } from './city';
 import { INCIDENTS } from './incidents';
+import { normalizeLayout } from './layout';
 import { ledgerIsBalanced } from './ledger';
 import { CAMPAIGNS } from './marketing';
+import { newRival } from './rival';
 import { GameStateSchema, type GameState } from './state';
 
 export const SAVE_FORMAT = 'coffee-inc-3-save';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface SaveFile {
   format: typeof SAVE_FORMAT;
@@ -40,6 +43,39 @@ export const MIGRATIONS: Record<number, (state: RawState) => RawState> = {
       yesterday: withMarketingAccrued(s.yesterday),
     };
   },
+  // Version 3: one store becomes a list of stores on lots, plus the rival chain.
+  2: (s) => {
+    const district = typeof s.neighborhoodId === 'string' && LOTS.some((l) => l.districtId === s.neighborhoodId) ? s.neighborhoodId : 'old-town';
+    const storeId = 'store1';
+    const old = (s.store ?? {}) as RawState;
+    const store = {
+      ...old,
+      id: storeId,
+      lotId: firstLotIn(district).id,
+      openedHour: 0,
+      layout: {},
+      staff: s.staff ?? [],
+      manager: null,
+      today: s.today,
+      yesterday: s.yesterday ?? null,
+      week: s.week ?? { served: 0, lost: 0 },
+      lastHour: s.lastHour ?? null,
+    };
+    const ledger = (s.ledger ?? {}) as RawState;
+    const journal = Array.isArray(ledger.journal) ? (ledger.journal as RawState[]) : [];
+    const reports = Array.isArray(s.reports) ? (s.reports as RawState[]) : [];
+    const rest: RawState = { ...s };
+    for (const k of ['neighborhoodId', 'store', 'staff', 'today', 'yesterday', 'week', 'lastHour']) delete rest[k];
+    return {
+      ...rest,
+      stores: [store],
+      ledger: { ...ledger, journal: journal.map((e) => ({ ...e, storeId: e.kind === 'financing' || e.memo === 'Loan interest' ? null : storeId })) },
+      reports: reports.map((r) => ({ ...r, stores: [] })),
+      incidents: (Array.isArray(s.incidents) ? (s.incidents as RawState[]) : []).map((i) => ({ ...i, storeId })),
+      modifiers: (Array.isArray(s.modifiers) ? (s.modifiers as RawState[]) : []).map((m) => ({ ...m, storeId })),
+      rival: newRival(),
+    };
+  },
 };
 
 export const makeSave = (state: GameState, savedAtMs: number): SaveFile => ({
@@ -50,16 +86,22 @@ export const makeSave = (state: GameState, savedAtMs: number): SaveFile => ({
 });
 
 function semanticProblem(state: GameState): string | null {
-  if (!NEIGHBORHOODS.some((n) => n.id === state.neighborhoodId)) return `unknown neighborhood "${state.neighborhoodId}"`;
-  const badEquipment = state.store.equipment.find((e) => !EQUIPMENT.some((t) => t.id === e.typeId));
-  if (badEquipment) return `unknown equipment "${badEquipment.typeId}"`;
+  const lots = [...state.stores.map((s) => s.lotId), ...state.rival.stores.map((r) => r.lotId)];
+  const badLot = lots.find((id) => !LOTS.some((l) => l.id === id));
+  if (badLot) return `unknown lot "${badLot}"`;
+  if (new Set(lots).size !== lots.length) return 'two stores on the same lot';
+  if (new Set(state.stores.map((s) => s.id)).size !== state.stores.length) return 'duplicate store ids';
+  for (const store of state.stores) {
+    const badEquipment = store.equipment.find((e) => !EQUIPMENT.some((t) => t.id === e.typeId));
+    if (badEquipment) return `unknown equipment "${badEquipment.typeId}"`;
+    if (new Set(store.staff.map((s) => s.id)).size !== store.staff.length) return 'duplicate staff ids';
+    for (const [id, level] of Object.entries(store.marketing)) {
+      const c = CAMPAIGNS.find((x) => x.id === id);
+      if (!c || !c.levels[level]) return `unknown marketing campaign "${id}"`;
+    }
+  }
   const badIncident = state.incidents.find((i) => !INCIDENTS.some((d) => d.id === i.defId));
   if (badIncident) return `unknown incident "${badIncident.defId}"`;
-  if (new Set(state.staff.map((s) => s.id)).size !== state.staff.length) return 'duplicate staff ids';
-  for (const [id, level] of Object.entries(state.store.marketing)) {
-    const c = CAMPAIGNS.find((x) => x.id === id);
-    if (!c || !c.levels[level]) return `unknown marketing campaign "${id}"`;
-  }
   if (!ledgerIsBalanced(state)) return 'the books do not balance';
   return null;
 }
@@ -97,9 +139,12 @@ export function parseSave(raw: unknown, migrations = MIGRATIONS, currentVersion 
     return { ok: false, error: `The save is damaged (${issue ? `${issue.path.join('.')}: ${issue.message}` : 'invalid data'}).` };
   }
   const game = parsed.data;
-  for (const item of MENU) game.store.menu[item.id] ??= { enabled: false, price: item.refPrice };
   const problem = semanticProblem(game);
   if (problem) return { ok: false, error: `The save is damaged (${problem}).` };
+  for (const store of game.stores) {
+    for (const item of MENU) store.menu[item.id] ??= { enabled: false, price: item.refPrice };
+    normalizeLayout(store);
+  }
 
   const savedAtMs = typeof file.savedAtMs === 'number' && Number.isFinite(file.savedAtMs) ? file.savedAtMs : Date.now();
   return { ok: true, save: { format: SAVE_FORMAT, version: currentVersion, savedAtMs, state: game } };

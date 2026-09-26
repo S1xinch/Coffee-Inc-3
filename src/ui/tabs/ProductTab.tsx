@@ -1,5 +1,5 @@
-import { MENU, MENU_CATEGORY_EQUIPMENT, neighborhood, type MenuCategory } from '../../sim/catalog';
-import { itemAvailable } from '../../sim/store';
+import { MENU, MENU_CATEGORY_EQUIPMENT, type MenuCategory } from '../../sim/catalog';
+import { itemAvailable, storeDistrict } from '../../sim/store';
 import { MinusIcon, PlusIcon } from '../Icons';
 import { Card, Money } from '../bits';
 import { useGameUi } from '../context';
@@ -21,8 +21,8 @@ const NEEDS: Record<MenuCategory, string> = {
 const STEP = 25;
 
 export function ProductTab() {
-  const { state, act, openSheet } = useGameUi();
-  const sensitivity = neighborhood(state.neighborhoodId).priceSensitivity;
+  const { store, openSheet, storeAct } = useGameUi();
+  const sensitivity = storeDistrict(store).priceSensitivity;
   const sensitivityLabel = sensitivity >= 1.3 ? 'high' : sensitivity <= 0.8 ? 'low' : 'medium';
 
   return (
@@ -33,8 +33,8 @@ export function ProductTab() {
       </p>
       {(Object.keys(CATEGORY_TITLES) as MenuCategory[]).map((category) => {
         const items = MENU.filter((m) => m.category === category);
-        const available = items.length > 0 && itemAvailable(state, items[0]!);
-        const broken = state.store.equipment.some((e) => e.broken && e.typeId.startsWith(MENU_CATEGORY_EQUIPMENT[category]));
+        const available = items.length > 0 && itemAvailable(store, items[0]!);
+        const broken = store.equipment.some((e) => e.broken && e.typeId.startsWith(MENU_CATEGORY_EQUIPMENT[category]));
         return (
           <Card
             key={category}
@@ -50,7 +50,7 @@ export function ProductTab() {
             {!available && <p className="muted small">{broken ? 'The machine for these is broken.' : `Needs ${NEEDS[category]}.`}</p>}
             <ul className={`menu-list ${available ? '' : 'dim'}`}>
               {items.map((item) => {
-                const entry = state.store.menu[item.id]!;
+                const entry = store.menu[item.id]!;
                 const margin = Math.round(((entry.price - item.unitCost) / entry.price) * 100);
                 return (
                   <li key={item.id}>
@@ -58,7 +58,7 @@ export function ProductTab() {
                       <input
                         type="checkbox"
                         checked={entry.enabled}
-                        onChange={(e) => act({ type: 'setMenuItem', itemId: item.id, enabled: e.target.checked })}
+                        onChange={(e) => storeAct({ type: 'setMenuItem', itemId: item.id, enabled: e.target.checked })}
                       />
                       <span>
                         <span className="menu-name">{item.name}</span>
@@ -71,7 +71,7 @@ export function ProductTab() {
                       <button
                         className="btn btn-icon"
                         aria-label={`Lower ${item.name} price`}
-                        onClick={() => act({ type: 'setMenuItem', itemId: item.id, price: entry.price - STEP })}
+                        onClick={() => storeAct({ type: 'setMenuItem', itemId: item.id, price: entry.price - STEP })}
                       >
                         <MinusIcon />
                       </button>
@@ -81,7 +81,7 @@ export function ProductTab() {
                       <button
                         className="btn btn-icon"
                         aria-label={`Raise ${item.name} price`}
-                        onClick={() => act({ type: 'setMenuItem', itemId: item.id, price: entry.price + STEP })}
+                        onClick={() => storeAct({ type: 'setMenuItem', itemId: item.id, price: entry.price + STEP })}
                       >
                         <PlusIcon />
                       </button>

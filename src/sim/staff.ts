@@ -1,6 +1,6 @@
 import { FIRST_NAMES, LAST_NAMES, marketWage } from './catalog';
 import { newId, pick, random, randomInt } from './rng';
-import type { Candidate, GameState } from './state';
+import type { Candidate, GameState, Store } from './state';
 import { addLog } from './log';
 
 export function generateCandidate(state: GameState): Candidate {
@@ -17,22 +17,22 @@ export function generateCandidate(state: GameState): Candidate {
 }
 
 export function refreshCandidates(state: GameState): void {
-  state.candidates = Array.from({ length: 4 }, () => generateCandidate(state));
+  state.candidates = Array.from({ length: 3 + state.stores.length }, () => generateCandidate(state));
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-export function updateMoraleAndQuits(state: GameState, utilization: number): void {
+export function updateMoraleAndQuits(state: GameState, store: Store, utilization: number): void {
   const overwork = Math.max(0, utilization - 0.85) * 100;
-  for (const s of state.staff) {
+  for (const s of store.staff) {
     const wageDelta = (s.wage - marketWage(s.skill)) / 100;
     const target = clamp(65 + 8 * wageDelta - overwork, 5, 100);
     s.morale = clamp(Math.round((s.morale + (target - s.morale) * 0.15) * 10) / 10, 0, 100);
   }
-  const quitters = state.staff.filter((s) => s.morale < 25 && random(state) < 0.15);
+  const quitters = store.staff.filter((s) => s.morale < 25 && random(state) < 0.15);
   for (const q of quitters) {
     addLog(state, 'bad', `${q.name} quit. Morale was too low.`);
     state.lifetime.staffQuit += 1;
   }
-  state.staff = state.staff.filter((s) => !quitters.includes(s));
+  store.staff = store.staff.filter((s) => !quitters.includes(s));
 }

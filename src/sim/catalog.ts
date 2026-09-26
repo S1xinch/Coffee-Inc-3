@@ -20,14 +20,15 @@ export const REPAIR_RATE = 0.12;
 export const MIN_PRICE = dollars(0.5);
 export const MAX_PRICE = dollars(20);
 export const REPORTS_KEPT = 52;
-export const LOG_KEPT = 60;
+export const LOG_KEPT = 80;
+export const MANAGER_SALARY = dollars(1_100);
+export const LEASE_SIGNING_WEEKS = 1;
 
 export const CITY_NAME = 'Seattle';
 
 export interface Neighborhood {
   id: string;
   name: string;
-  address: string;
   blurb: string;
   trafficPerHour: number;
   weeklyRent: Cents;
@@ -38,25 +39,46 @@ export const NEIGHBORHOODS: readonly Neighborhood[] = [
   {
     id: 'old-town',
     name: 'Old Town',
-    address: '118 Cobble Lane',
     blurb: 'Quiet brick streets and loyal locals. Cheapest lease, slowest foot traffic.',
     trafficPerHour: 200,
     weeklyRent: dollars(1_100),
     priceSensitivity: 1.0,
   },
   {
+    id: 'hillside',
+    name: 'Hillside',
+    blurb: 'Leafy streets of houses. Neighbors who come back every day.',
+    trafficPerHour: 180,
+    weeklyRent: dollars(950),
+    priceSensitivity: 1.2,
+  },
+  {
     id: 'university',
     name: 'University District',
-    address: '4521 College Ave',
     blurb: 'Busy all day with students who watch every dollar.',
     trafficPerHour: 260,
     weeklyRent: dollars(1_500),
     priceSensitivity: 1.6,
   },
   {
+    id: 'market',
+    name: 'Market District',
+    blurb: 'Old warehouses turned into food halls and studios.',
+    trafficPerHour: 240,
+    weeklyRent: dollars(1_700),
+    priceSensitivity: 1.1,
+  },
+  {
+    id: 'waterfront',
+    name: 'Waterfront',
+    blurb: 'Ferry commuters and tourists walking the piers.',
+    trafficPerHour: 290,
+    weeklyRent: dollars(2_200),
+    priceSensitivity: 0.9,
+  },
+  {
     id: 'downtown',
     name: 'Downtown',
-    address: '700 Pine Street',
     blurb: 'Office crowds with big morning rushes. Premium lease.',
     trafficPerHour: 330,
     weeklyRent: dollars(3_000),

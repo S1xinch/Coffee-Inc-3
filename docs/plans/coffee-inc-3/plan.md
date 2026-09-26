@@ -25,6 +25,15 @@ Goals, in priority order:
 - All art stays original: no elephant logo, no "Blue Elephant Cafe", none of Side Labs' assets. Players pick their own logo and brand color.
 - Save format moves to version 2, with a migration from version 1.
 
+**2026-09-26 (owner): "go ahead with phase 2 but could you make the first city bigger? add water, a dock, districts"**
+- Phase 2 is built. The city grows from 15×18 to 26×26 tiles, with Elliott Bay along the south and west, a lake in the northeast, bridges where roads cross water, three piers with boats and a car ferry, and six districts: Downtown, Old Town, University District, Market District (warehouses), Waterfront, and Hillside (houses). There are 14 lots, each with its own street address, foot traffic, and rent.
+- Map data lives in `src/sim/city.ts`, so the simulation, renderer, and tests all use the same water, roads, districts, and lots.
+- Task 2.1 as built: the manager's status (Operating, Hiring, Repairing, Needs you) is worked out from the store every time it is shown, instead of stored as a state machine. It cannot get stuck, which was Coffee Inc 2's bug. Managers answer incidents on the spot, repair equipment in the morning when cash covers the repair plus a $500 buffer, and hire baristas to match yesterday's demand. They never buy equipment or change prices.
+- Task 2.2 as built: tap an item, then tap a floor square. Items swap if the square is taken. The queue lane, pickup spot, and doorway can never be blocked. A damaged layout in a save is repaired on load, never fatal. Seats follow the furniture, and customers seated at furniture that moves get up and leave.
+- Task 2.5 as built: Northline Coffee starts with two stores (Waterfront and University District). It answers your prices every week, drifts between 3.3 and 4.3 stars, and opens a store on a free lot every five weeks, up to six. Your own stores in the same district also share walk-ins.
+- Incidents only happen at stores that are ready to open, so a new empty store doesn't get pop-ups.
+- Save format moves to version 3 (one store becomes a list of stores on lots, plus the rival), with a migration from version 2.
+
 **Defaults applied to the still-open questions** (easy to change later, none block the MVP):
 - Monetization: none in the MVP. Revisit before launch; no pay-to-win either way.
 - Save/sync: local-only (IndexedDB) plus JSON export/import. Account-based cloud save stays a later phase.
@@ -152,7 +161,7 @@ Dependencies: 0.1, 0.3.
 **Task 1.3 — Offline/idle progress**: resume-time catch-up calculation with capped chunking.
 **Task 1.4 — Save/load + export**: wired to Phase 0 persistence, with the "back up your save" prompt.
 
-### Phase 2 — Grow to a Local Chain (chosen 2026-09-26)
+### Phase 2 — Grow to a Local Chain (chosen 2026-09-26, built 2026-09-26)
 **Task 2.1 — Store manager FSM** (fixes bug #7): hire a manager per store; explicit states (Staffing, Operating, Restocking, NeedsAttention), self-healing invariant checks every tick, UI badge when a store needs you.
 **Task 2.2 — Custom interior editor** (fixes bug #2): drag-to-place on the isometric grid, schema-validated layout, per-item error boundaries, layout affects flow and seating.
 **Task 2.3 — Multiple stores in the first city**: isometric city map with lots to lease, per-store P&L rolled up into company statements, store switcher.

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { lot } from '../sim/city';
 import { formatMoney } from '../sim/money';
 import type { WeekReport } from '../sim/state';
 import type { ProgressSummary } from '../sim/summary';
@@ -71,6 +72,26 @@ export function WeekReportModal({ report, previous, onContinue, onStatements }: 
           </tr>
         </tbody>
       </table>
+      {report.stores.length > 1 && (
+        <table className="fin">
+          <thead>
+            <tr>
+              <th scope="col">Store</th>
+              <th scope="col">Sales</th>
+              <th scope="col">Net income</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.stores.map((r) => (
+              <tr key={r.storeId}>
+                <th scope="row">{lot(r.lotId).address}</th>
+                <td>{formatMoney(r.revenue)}</td>
+                <td>{formatMoney(r.netIncome)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       <div className="dialog-actions">
         <button className="btn" onClick={onStatements}>Statements</button>
         <button className="btn btn-primary" onClick={onContinue}>Continue</button>
@@ -89,7 +110,7 @@ function duration(hours: number): string {
 export function AwayModal({ summary, onClose }: { summary: ProgressSummary; onClose: () => void }) {
   return (
     <Modal title="While you were away" onClose={onClose}>
-      <p>Your store kept running for {duration(summary.hours)} of game time.</p>
+      <p>Your company kept running for {duration(summary.hours)} of game time.</p>
       <table className="fin">
         <tbody>
           <tr>

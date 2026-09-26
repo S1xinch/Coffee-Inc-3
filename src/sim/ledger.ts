@@ -18,6 +18,7 @@ export function post(
   memo: string,
   kind: EntryKind,
   lines: ReadonlyArray<readonly [Account, Cents]>,
+  storeId: string | null = null,
 ): void {
   const nonZero = lines.filter(([, amount]) => amount !== 0);
   let sum = 0;
@@ -34,6 +35,7 @@ export function post(
     memo,
     kind,
     lines: nonZero.map(([account, amount]) => ({ account, amount })),
+    storeId,
   });
 }
 
@@ -52,8 +54,8 @@ export const cashBalance = (state: GameState): Cents => balances(state).cash;
 export function incomeStatement(entries: readonly JournalEntry[]): IncomeStatement {
   const t: Record<Account, Cents> = Object.fromEntries(ACCOUNTS.map((a) => [a, 0])) as Record<Account, Cents>;
   for (const e of entries) for (const l of e.lines) t[l.account] += l.amount;
-  const revenue = -t.salesRevenue;
-  const otherIncome = -t.otherIncome;
+  const revenue = 0 - t.salesRevenue;
+  const otherIncome = 0 - t.otherIncome;
   const cogs = t.cogs;
   const grossProfit = revenue - cogs;
   const expenses = {
@@ -78,6 +80,8 @@ export function incomeStatement(entries: readonly JournalEntry[]): IncomeStateme
     netIncome: grossProfit + otherIncome - totalExpenses,
   };
 }
+
+export const storeEntries = (entries: readonly JournalEntry[], storeId: string) => entries.filter((e) => e.storeId === storeId);
 
 const INCOME_ACCOUNTS: readonly Account[] = [
   'salesRevenue', 'otherIncome', 'cogs', 'wages', 'rent', 'utilities', 'depreciation',

@@ -1,5 +1,5 @@
 import { dollars, type Cents } from './money';
-import type { GameState } from './state';
+import type { Store } from './state';
 
 export interface CampaignLevel {
   label: string;
@@ -65,12 +65,12 @@ export const campaign = (id: string): Campaign => {
   return c;
 };
 
-export function activeLevels(state: GameState): CampaignLevel[] {
-  return CAMPAIGNS.map((c) => c.levels[state.store.marketing[c.id] ?? 0] ?? OFF);
+export function activeLevels(store: Store): CampaignLevel[] {
+  return CAMPAIGNS.map((c) => c.levels[store.marketing[c.id] ?? 0] ?? OFF);
 }
 
-export const marketingTraffic = (state: GameState): number => activeLevels(state).reduce((m, l) => m * (1 + l.traffic), 1);
-export const marketingBuzz = (state: GameState): number => activeLevels(state).reduce((s, l) => s + l.buzz, 0);
-export const marketingAtmosphere = (state: GameState): number => activeLevels(state).reduce((s, l) => s + l.atmosphere, 0);
-export const perCupCost = (state: GameState): Cents => activeLevels(state).reduce((s, l) => s + l.perCup, 0);
-export const weeklyMarketingCost = (state: GameState): Cents => activeLevels(state).reduce((s, l) => s + l.weeklyCost, 0);
+export const marketingTraffic = (store: Store): number => activeLevels(store).reduce((m, l) => m * (1 + l.traffic), 1);
+export const marketingBuzz = (store: Store): number => activeLevels(store).reduce((s, l) => s + l.buzz, 0);
+export const marketingAtmosphere = (store: Store): number => activeLevels(store).reduce((s, l) => s + l.atmosphere, 0);
+export const perCupCost = (store: Store): Cents => activeLevels(store).reduce((s, l) => s + l.perCup, 0);
+export const weeklyMarketingCost = (store: Store): Cents => activeLevels(store).reduce((s, l) => s + l.weeklyCost, 0);

@@ -1,24 +1,19 @@
-import {
-  DAY_TRAFFIC,
-  MENU,
-  TRAFFIC_CURVE,
-  equipmentType,
-  neighborhood,
-  type MenuCategory,
-  type MenuItem,
-} from './catalog';
+import { DAY_TRAFFIC, MENU, TRAFFIC_CURVE, equipmentType, type MenuCategory, type MenuItem } from './catalog';
 import { marketingTraffic } from './marketing';
+import { competitionFactor } from './rival';
 import { random } from './rng';
 import {
   ambianceMultiplier,
   itemAvailable,
   itemQuality,
+  lotTraffic,
   serviceCapacity,
+  storeDistrict,
   supplierCostMultiplier,
   trafficBoost,
   workingEquipment,
 } from './store';
-import type { GameState } from './state';
+import type { GameState, Store } from './state';
 
 export interface HourSales {
   demand: number;
@@ -58,45 +53,46 @@ interface Offer {
   score: number;
 }
 
-function offers(state: GameState, drinks: boolean): Offer[] {
-  const sensitivity = neighborhood(state.neighborhoodId).priceSensitivity;
+function offers(state: GameState, store: Store, drinks: boolean): Offer[] {
+  const sensitivity = storeDistrict(store).priceSensitivity;
   return MENU.filter((m) => (m.category === 'pastry') !== drinks)
-    .filter((m) => state.store.menu[m.id]?.enabled && itemAvailable(state, m))
+    .filter((m) => store.menu[m.id]?.enabled && itemAvailable(store, m))
     .map((item) => {
-      const price = state.store.menu[item.id]!.price;
+      const price = store.menu[item.id]!.price;
       const priceRatio = item.refPrice / price;
       const priceFactor = Math.min(2.5, Math.pow(priceRatio, item.elasticity * sensitivity));
-      const quality = itemQuality(state, item);
+      const quality = itemQuality(state, store, item);
       return { item, price, priceRatio, quality, score: priceFactor * quality };
     });
 }
 
-export function expectedVisitors(state: GameState): number {
+export function expectedVisitors(state: GameState, store: Store): number {
   const hourOfDay = state.hour % 24;
   const dayIndex = Math.floor(state.hour / 24) % 7;
-  const awareness = 0.25 + (0.75 * state.store.reputation) / 100;
+  const awareness = 0.25 + (0.75 * store.reputation) / 100;
   return (
-    neighborhood(state.neighborhoodId).trafficPerHour *
+    lotTraffic(store) *
     (TRAFFIC_CURVE[hourOfDay] ?? 0) *
     (DAY_TRAFFIC[dayIndex] ?? 1) *
     awareness *
-    trafficBoost(state) *
-    marketingTraffic(state)
+    trafficBoost(state, store) *
+    marketingTraffic(store) *
+    competitionFactor(state, store)
   );
 }
 
-export function simulateHourSales(state: GameState): HourSales {
-  const drinks = offers(state, true);
+export function simulateHourSales(state: GameState, store: Store): HourSales {
+  const drinks = offers(state, store, true);
   const noise = 0.9 + 0.2 * random(state);
-  const capacity = serviceCapacity(state);
+  const capacity = serviceCapacity(state, store);
   const empty: HourSales = { demand: 0, served: 0, lost: 0, revenue: 0, cogs: 0, capacity, qualitySum: 0, priceRatioSum: 0, sold: {} };
   if (drinks.length === 0) return empty;
 
   const offeredPopularity = drinks.reduce((s, d) => s + d.item.popularity, 0);
   const avgScore = drinks.reduce((s, d) => s + d.item.popularity * d.score, 0) / offeredPopularity;
   const variety = 0.7 + (0.3 * offeredPopularity) / TOTAL_DRINK_POPULARITY;
-  const conversion = 0.3 * Math.min(avgScore, 1.6) * variety * ambianceMultiplier(state);
-  const demand = Math.round(expectedVisitors(state) * conversion * noise);
+  const conversion = 0.3 * Math.min(avgScore, 1.6) * variety * ambianceMultiplier(store);
+  const demand = Math.round(expectedVisitors(state, store) * conversion * noise);
 
   const counts = allocate(Math.min(demand, Math.floor(capacity)), drinks.map((d) => d.item.popularity * d.score));
 
@@ -108,7 +104,7 @@ export function simulateHourSales(state: GameState): HourSales {
     byCategory.set(d.item.category, list);
   });
   for (const [category, indexes] of byCategory) {
-    const machine = workingEquipment(state, category);
+    const machine = workingEquipment(store, category);
     const cap = machine ? equipmentType(machine.typeId).capacity : 0;
     const total = indexes.reduce((s, i) => s + (counts[i] ?? 0), 0);
     if (total > cap) {
@@ -133,7 +129,7 @@ export function simulateHourSales(state: GameState): HourSales {
     priceRatioSum += n * Math.min(d.priceRatio, 2);
   });
 
-  const pastries = offers(state, false);
+  const pastries = offers(state, store, false);
   if (pastries.length > 0 && served > 0) {
     const pastryScore = pastries.reduce((s, p) => s + p.score, 0) / pastries.length;
     const attach = Math.min(0.6, 0.35 * pastryScore);
@@ -152,7 +148,7 @@ export function simulateHourSales(state: GameState): HourSales {
     served,
     lost: Math.max(0, demand - served),
     revenue,
-    cogs: Math.round(rawCogs * supplierCostMultiplier(state)),
+    cogs: Math.round(rawCogs * supplierCostMultiplier(state, store)),
     capacity,
     qualitySum,
     priceRatioSum,

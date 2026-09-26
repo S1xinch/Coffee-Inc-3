@@ -10,6 +10,10 @@ export interface SceneModel {
   speed: number;
   companyName: string;
   brandColor: string;
+  // Movable furniture on floor cells. Without it, furniture fills the default spots in order.
+  placed?: readonly { id: string; typeId: string; x: number; y: number }[];
+  // Arrange mode draws the floor grid and highlights the picked item and the free cells.
+  arrange?: { selected: string | null; free: readonly { x: number; y: number }[] } | null;
 }
 
 // Reserved room at the top of the canvas where the dialogue band sits over the scene.
@@ -41,13 +45,15 @@ const LEAVE_PATH: Pt[] = [{ x: 8.0, y: 5.3 }, { x: 8.72, y: 5.6 }, { x: 8.72, y:
 const PASS_A: Pt[] = [{ x: -1.2, y: 6.95 }, { x: 8.9, y: 6.95 }, { x: 8.9, y: -0.9 }];
 const PASS_B: Pt[] = [{ x: 9.1, y: -0.9 }, { x: 9.1, y: 7.1 }, { x: -1.2, y: 7.1 }];
 const TABLE_SLOTS: Pt[] = [
-  { x: 1.2, y: 3.7 }, { x: 2.8, y: 3.7 }, { x: 4.4, y: 3.7 },
-  { x: 1.2, y: 5.1 }, { x: 2.8, y: 5.1 }, { x: 4.4, y: 5.1 },
+  { x: 1, y: 3 }, { x: 3, y: 3 }, { x: 5, y: 3 },
+  { x: 1, y: 5 }, { x: 3, y: 5 }, { x: 5, y: 5 },
 ];
-const ARMCHAIR_SLOTS: Pt[] = [{ x: 0.95, y: 2.55 }, { x: 2.3, y: 2.55 }];
-const PLANT_SLOTS: Pt[] = [{ x: 0.5, y: 1.45 }, { x: 7.72, y: 0.45 }, { x: 0.45, y: 5.6 }, { x: 5.7, y: 5.75 }];
+const ARMCHAIR_SLOTS: Pt[] = [{ x: 0, y: 2 }, { x: 1, y: 2 }];
+const PLANT_SLOTS: Pt[] = [{ x: 0, y: 1 }, { x: 7, y: 2 }, { x: 0, y: 5 }, { x: 5, y: 5 }];
+// A floor cell's center in room coordinates.
+const cellCenter = (c: Pt): Pt => ({ x: c.x + 0.5, y: c.y + 0.5 });
 const BARISTA_X = [6.9, 4.6, 2.9, 5.7, 3.7, 1.9];
-const LAMP_SLOTS: Pt[] = [{ x: 1.2, y: 3.7 }, { x: 2.8, y: 3.7 }, { x: 4.4, y: 3.7 }];
+const LAMP_SLOTS: Pt[] = [{ x: 1.5, y: 3.5 }, { x: 3.5, y: 3.5 }, { x: 5.5, y: 3.5 }];
 
 type WalkerState = 'enter' | 'queue' | 'order' | 'toPickup' | 'pickup' | 'toSeat' | 'seated' | 'leave' | 'pass';
 
@@ -300,6 +306,27 @@ export class StoreScene {
     this.last = 0;
   }
 
+  // Furniture positions from the store layout, or the default spots for the title screen.
+  private furniture(typeId: string): { id: string; at: Pt }[] {
+    const m = this.model;
+    if (!m) return [];
+    if (m.placed) return m.placed.filter((p) => p.typeId === typeId).map((p) => ({ id: p.id, at: cellCenter(p) }));
+    const slots = typeId === 'table' ? TABLE_SLOTS : typeId === 'armchair' ? ARMCHAIR_SLOTS : PLANT_SLOTS;
+    return slots.slice(0, this.count(typeId)).map((c, i) => ({ id: `${typeId}${i}`, at: cellCenter(c) }));
+  }
+
+  // Maps a tap in canvas pixels to the floor cell under it.
+  cellAt(px: number, py: number): Pt | null {
+    if (this.scale === 0) return null;
+    const wx = (px - this.ox) / this.scale;
+    const wy = (py - this.oy) / this.scale;
+    const a = (2 * wx) / TW;
+    const b = (2 * wy) / TH;
+    const x = Math.floor((a + b) / 2);
+    const y = Math.floor((b - a) / 2);
+    return x >= 0 && x < ROOM_X && y >= 0 && y < ROOM_Y ? { x, y } : null;
+  }
+
   private count(typeId: string): number {
     return this.model?.equipment.filter((e) => e === typeId).length ?? 0;
   }
@@ -310,14 +337,21 @@ export class StoreScene {
 
   private rebuildSeats(): void {
     const next: Seat[] = [];
-    TABLE_SLOTS.slice(0, this.count('table')).forEach((t) => {
+    this.furniture('table').forEach(({ at: t }) => {
       next.push({ x: t.x - 0.42, y: t.y, occupant: null }, { x: t.x + 0.42, y: t.y, occupant: null });
     });
-    ARMCHAIR_SLOTS.slice(0, this.count('armchair')).forEach((a) => next.push({ x: a.x, y: a.y, occupant: null }));
-    next.forEach((s, i) => (s.occupant = this.seats[i]?.occupant ?? null));
+    this.furniture('armchair').forEach(({ at: a }) => next.push({ x: a.x, y: a.y, occupant: null }));
+    // A seat keeps its customer only if it did not move.
+    next.forEach((s, i) => {
+      const old = this.seats[i];
+      s.occupant = old && old.x === s.x && old.y === s.y ? old.occupant : null;
+    });
+    for (const w of this.walkers) {
+      if (w.seat !== null && this.seats[w.seat]?.occupant === w.id && next[w.seat]?.occupant !== w.id) w.seat = -1;
+    }
     this.seats = next;
     for (const w of this.walkers) {
-      if (w.seat !== null && !this.seats[w.seat]) {
+      if (w.seat !== null && (w.seat === -1 || !this.seats[w.seat])) {
         w.seat = null;
         this.leave(w);
       }
@@ -493,7 +527,8 @@ export class StoreScene {
     }
 
     const drawables: { depth: number; draw: () => void }[] = [];
-    const tables = TABLE_SLOTS.slice(0, this.count('table'));
+    if (m.arrange) this.arrangeGrid(ctx, m.arrange);
+    const tables = this.furniture('table').map((f) => f.at);
     tables.forEach((t, ti) => {
       const leftSeat = this.seats[ti * 2];
       const rightSeat = this.seats[ti * 2 + 1];
@@ -504,8 +539,8 @@ export class StoreScene {
       });
       drawables.push({ depth: t.x + 0.42 + t.y + 0.01, draw: () => this.chair(t.x + 0.42, t.y, true) });
     });
-    ARMCHAIR_SLOTS.slice(0, this.count('armchair')).forEach((a) => drawables.push({ depth: a.x + a.y - 0.01, draw: () => this.armchair(a.x, a.y) }));
-    PLANT_SLOTS.slice(0, this.count('plant')).forEach((p) => drawables.push({ depth: p.x + p.y, draw: () => this.plant(p.x, p.y) }));
+    this.furniture('armchair').forEach(({ at: a }) => drawables.push({ depth: a.x + a.y - 0.01, draw: () => this.armchair(a.x, a.y) }));
+    this.furniture('plant').forEach(({ at: p }) => drawables.push({ depth: p.x + p.y, draw: () => this.plant(p.x, p.y) }));
     for (const w of this.walkers) {
       const seated = w.state === 'seated';
       drawables.push({
@@ -528,6 +563,18 @@ export class StoreScene {
       this.setWorld(ctx);
     }
     if (this.count('lights') > 0) this.lamps(m);
+  }
+
+  private arrangeGrid(ctx: Ctx, arrange: NonNullable<SceneModel['arrange']>): void {
+    const tile = (c: Pt, fill: string, stroke: string) =>
+      poly(ctx, [iso(c.x + 0.06, c.y + 0.06), iso(c.x + 0.94, c.y + 0.06), iso(c.x + 0.94, c.y + 0.94), iso(c.x + 0.06, c.y + 0.94)], fill, stroke);
+    ctx.lineWidth = 1.5;
+    for (const c of arrange.free) tile(c, arrange.selected ? 'rgba(90, 200, 120, 0.4)' : 'rgba(255, 255, 255, 0.22)', 'rgba(255, 255, 255, 0.85)');
+    // Everything that can be moved gets a gold outline; the picked item is filled.
+    for (const p of this.model?.placed ?? []) {
+      tile(p, p.id === arrange.selected ? 'rgba(255, 196, 64, 0.6)' : 'rgba(255, 196, 64, 0.18)', '#ffc440');
+    }
+    ctx.lineWidth = 1;
   }
 
   // Dark building fronts across the street fill the canvas behind the store.

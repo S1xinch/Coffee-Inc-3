@@ -11,10 +11,10 @@ const GROUPS: { title: string; categories: EquipmentType['category'][]; note?: s
 ];
 
 export function BuildTab() {
-  const { state, act, confirm } = useGameUi();
+  const { store, confirm, storeAct } = useGameUi();
 
   const sell = async (equipmentId: string) => {
-    const e = state.store.equipment.find((x) => x.id === equipmentId);
+    const e = store.equipment.find((x) => x.id === equipmentId);
     if (!e) return;
     const t = equipmentType(e.typeId);
     const value = Math.round(bookValue(e) * RESALE_RATE);
@@ -24,22 +24,22 @@ export function BuildTab() {
       confirmLabel: 'Sell',
       danger: true,
     });
-    if (ok) await act({ type: 'sellEquipment', equipmentId });
+    if (ok) await storeAct({ type: 'sellEquipment', equipmentId });
   };
 
   return (
     <div className="stack">
       <p className="muted">
-        Ambiance {Math.min(ambiancePoints(state), 16)} of 16. Seating and decor make the room nicer, which raises satisfaction and brings people back.
+        Ambiance {Math.min(ambiancePoints(store), 16)} of 16. Seating and decor make the room nicer, which raises satisfaction and brings people back.
       </p>
       {GROUPS.map((group) => (
         <Card key={group.title} title={group.title}>
           {group.note && <p className="muted small">{group.note}</p>}
           <ul className="shop">
             {EQUIPMENT.filter((t) => group.categories.includes(t.category)).map((t) => {
-              const owned = state.store.equipment.filter((e) => e.typeId === t.id);
+              const owned = store.equipment.filter((e) => e.typeId === t.id);
               const single = SINGLE_UNIT_CATEGORIES.includes(t.category);
-              const current = single ? equipmentIn(state, t.category) : undefined;
+              const current = single ? equipmentIn(store, t.category) : undefined;
               const currentType = current ? equipmentType(current.typeId) : undefined;
               const isCurrent = current?.typeId === t.id;
               const isDowngrade = !!currentType && currentType.cost > t.cost;
@@ -56,7 +56,7 @@ export function BuildTab() {
                   </div>
                   <div className="shop-actions">
                     {isCurrent && current?.broken && (
-                      <button className="btn btn-small btn-primary" onClick={() => act({ type: 'repairEquipment', equipmentId: current.id })}>
+                      <button className="btn btn-small btn-primary" onClick={() => storeAct({ type: 'repairEquipment', equipmentId: current.id })}>
                         Repair <Money cents={Math.round(t.cost * REPAIR_RATE)} />
                       </button>
                     )}
@@ -66,7 +66,7 @@ export function BuildTab() {
                       </button>
                     )}
                     {!isCurrent && !isDowngrade && (single || owned.length < t.max) && (
-                      <button className="btn btn-small btn-primary" onClick={() => act({ type: 'buyEquipment', typeId: t.id })}>
+                      <button className="btn btn-small btn-primary" onClick={() => storeAct({ type: 'buyEquipment', typeId: t.id })}>
                         {current ? 'Upgrade' : 'Buy'} <Money cents={t.cost - tradeIn} />
                       </button>
                     )}
