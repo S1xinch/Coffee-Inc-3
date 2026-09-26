@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CITY_NAME, NEIGHBORHOODS, neighborhood } from '../sim/catalog';
-import type { Command } from '../sim/commands';
+import { CITY_NAME, LEASE_SIGNING_WEEKS, neighborhood } from '../sim/catalog';
+import { LOTS, lot as lotById } from '../sim/city';
+import type { Command, StoreCommand } from '../sim/commands';
 import { calendarDate, clockInfo, formatTime, type Speed } from '../sim/clock';
 import { incidentDef, incidentStaff } from '../sim/incidents';
 import { cashBalance } from '../sim/ledger';
 import { formatMoney } from '../sim/money';
+import { lotTaken } from '../sim/rival';
 import type { GameState } from '../sim/state';
+import { lotRent, storeById } from '../sim/store';
 import { exportSave, readImportFile } from '../persistence/storage';
 import { BrandMark, Portrait } from './Brand';
 import { CityView } from './CityView';
@@ -50,9 +53,10 @@ function IncidentModal({ state, incidentId, onChoose, onLater }: { state: GameSt
   if (!incident) return null;
   const def = incidentDef(incident.defId);
   const staff = incidentStaff(state, incident);
-  const speaker = staff ?? state.staff[0];
+  const store = storeById(state, incident.storeId);
+  const speaker = staff ?? store?.staff[0];
   return (
-    <Modal title={def.title} onClose={onLater}>
+    <Modal title={state.stores.length > 1 && store ? `${def.title} · ${lotById(store.lotId).address}` : def.title} onClose={onLater}>
       <div className="dialogue in-modal">
         <Portrait look={speaker?.look ?? 57} size={44} />
         <p>
@@ -103,12 +107,15 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
   const [tab, setTab] = useState<TabId>('service');
   const [sheet, setSheet] = useState<SheetId | null>(null);
   const [lot, setLot] = useState<string | null>(null);
+  const [rivalLot, setRivalLot] = useState<string | null>(null);
+  const [storeId, setStoreId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [popup, setPopup] = useState<string | null>(null);
   const [pauseOnReport, setPauseOnReportState] = useState(() => readPref('pauseOnReport', true));
   const seenIncidents = useRef(new Set<string>());
+  const [pendingOpen, setPendingOpen] = useState<{ lotId: string; before: Set<string> } | null>(null);
   const resumeSpeed = useRef<Speed | null>(null);
   const { state, send, setSpeed } = game;
 
@@ -141,7 +148,17 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
     setTab(t);
   }, []);
 
-  const ui = useMemo<GameUi | null>(() => (state ? { state, act, goTo, openSheet: setSheet, confirm } : null), [state, act, goTo, confirm]);
+  const store = state ? ((storeId && storeById(state, storeId)) || state.stores[0]!) : null;
+  const currentStoreId = store?.id ?? null;
+  const storeAct = useCallback((command: StoreCommand) => (currentStoreId ? act({ ...command, storeId: currentStoreId }) : Promise.resolve(false)), [act, currentStoreId]);
+  const ui = useMemo<GameUi | null>(
+    () => (state && store ? { state, store, act, storeAct, selectStore: setStoreId, goTo, openSheet: setSheet, confirm } : null),
+    [state, store, act, storeAct, goTo, confirm],
+  );
+  const openStore = useCallback((id: string) => {
+    setStoreId(id);
+    setView('store');
+  }, []);
   const clearToast = useCallback(() => setToast(null), []);
 
   const latestReport = state?.reports.at(-1);
@@ -167,6 +184,16 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
   useEffect(() => {
     if (popup && state && !state.incidents.some((i) => i.id === popup)) closePopup();
   }, [popup, state, closePopup]);
+
+  // After a lease goes through, open the new store once it shows up in state.
+  useEffect(() => {
+    if (!pendingOpen || !state) return;
+    const created = state.stores.find((s) => s.lotId === pendingOpen.lotId && !pendingOpen.before.has(s.id));
+    if (!created) return;
+    setPendingOpen(null);
+    openStore(created.id);
+    setSheet('customize');
+  }, [pendingOpen, state, openStore]);
 
   useEffect(() => {
     document.title = state ? `${state.companyName} · Coffee Inc 3` : 'Coffee Inc 3';
@@ -196,7 +223,9 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
   }
 
   const cash = cashBalance(state);
-  const lotInfo = lot ? neighborhood(lot) : null;
+  const leaseLot = lot && !lotTaken(state, lot) ? lotById(lot) : null;
+  const leaseDistrict = leaseLot ? neighborhood(leaseLot.districtId) : null;
+  const leaseRent = leaseLot ? lotRent(leaseLot.id) : 0;
   const legalBase = import.meta.env.BASE_URL;
 
   const ackReport = async (then: 'continue' | 'statements') => {
@@ -222,12 +251,21 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
 
         {view === 'city' ? (
           <main className="city">
-            <CityView state={state} onOpenStore={() => setView('store')} onLot={setLot} />
+            <CityView state={state} focusLotId={ui.store.lotId} onOpenStore={openStore} onLot={setLot} onRival={setRivalLot} />
             <div className="sr-only-list">
-              <button onClick={() => setView('store')}>Open {state.companyName}</button>
-              {NEIGHBORHOODS.filter((n) => n.id !== state.neighborhoodId).map((n) => (
-                <button key={n.id} onClick={() => setLot(n.id)}>
-                  Lot for lease in {n.name}
+              {state.stores.map((s) => (
+                <button key={s.id} onClick={() => openStore(s.id)}>
+                  Open your store at {lotById(s.lotId).address}
+                </button>
+              ))}
+              {LOTS.filter((l) => !lotTaken(state, l.id)).map((l) => (
+                <button key={l.id} onClick={() => setLot(l.id)}>
+                  Lot for lease at {l.address}, {neighborhood(l.districtId).name}
+                </button>
+              ))}
+              {state.rival.stores.map((r) => (
+                <button key={r.lotId} onClick={() => setRivalLot(r.lotId)}>
+                  {state.rival.name} at {lotById(r.lotId).address}
                 </button>
               ))}
             </div>
@@ -241,7 +279,7 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
                 <MenuIcon />
               </button>
             </div>
-            <p className="city-hint">Tap your pin to open {state.companyName}</p>
+            <p className="city-hint">Tap a pin to open it</p>
           </main>
         ) : (
           <StoreScreen tab={tab} onTab={setTab} speed={game.speed} onSpeed={setSpeed} onClose={() => setView('city')} saveError={game.saveError} />
@@ -253,31 +291,78 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
           </Modal>
         )}
 
-        {lotInfo && (
-          <Modal title={`For lease: ${lotInfo.name}`} onClose={() => setLot(null)}>
-            <p className="muted">{lotInfo.address}</p>
-            <p>{lotInfo.blurb}</p>
+        {leaseLot && leaseDistrict && (
+          <Modal title={`For lease: ${leaseLot.address}`} onClose={() => setLot(null)}>
+            <p className="muted">{leaseDistrict.name}</p>
+            <p>{leaseDistrict.blurb}</p>
             <table className="fin">
               <tbody>
                 <tr>
                   <th scope="row">Foot traffic</th>
-                  <td className="num">{lotInfo.trafficPerHour} people per hour</td>
+                  <td className="num">{Math.round(leaseDistrict.trafficPerHour * leaseLot.trafficMod)} people per hour</td>
                 </tr>
                 <tr>
                   <th scope="row">Rent</th>
                   <td>
-                    <Money cents={lotInfo.weeklyRent} /> per week
+                    <Money cents={leaseRent} /> per week
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Signing fee</th>
+                  <td>
+                    <Money cents={leaseRent * LEASE_SIGNING_WEEKS} />
                   </td>
                 </tr>
                 <tr>
                   <th scope="row">Price sensitivity</th>
-                  <td>{lotInfo.priceSensitivity >= 1.3 ? 'High' : lotInfo.priceSensitivity <= 0.8 ? 'Low' : 'Medium'}</td>
+                  <td>{leaseDistrict.priceSensitivity >= 1.3 ? 'High' : leaseDistrict.priceSensitivity <= 0.8 ? 'Low' : 'Medium'}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Competition</th>
+                  <td>
+                    {[
+                      state.stores.filter((s) => lotById(s.lotId).districtId === leaseLot.districtId).length > 0 ? 'Your own store nearby' : '',
+                      state.rival.stores.some((r) => lotById(r.lotId).districtId === leaseLot.districtId) ? `${state.rival.name} is here` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(', ') || 'None yet'}
+                  </td>
                 </tr>
               </tbody>
             </table>
-            <p className="muted small">Leasing a second location comes with multi-store support in the next update. For now, one store is the whole company.</p>
+            <p className="muted small">The new store starts empty. Furnish it, hire a team, and consider a manager so it runs while you are elsewhere.</p>
             <div className="dialog-actions">
-              <button className="btn btn-primary" onClick={() => setLot(null)}>
+              <button className="btn" onClick={() => setLot(null)}>
+                Not now
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  const before = new Set(state.stores.map((s) => s.id));
+                  const lotId = leaseLot.id;
+                  if (!(await act({ type: 'leaseLot', lotId }))) return;
+                  setLot(null);
+                  setPendingOpen({ lotId, before });
+                }}
+              >
+                Lease this lot <Money cents={leaseRent * LEASE_SIGNING_WEEKS} />
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {rivalLot && (
+          <Modal title={state.rival.name} onClose={() => setRivalLot(null)}>
+            <p className="muted">
+              {lotById(rivalLot).address}, {neighborhood(lotById(rivalLot).districtId).name}
+            </p>
+            <p>
+              A rival chain with {state.rival.stores.length} stores in {CITY_NAME}. Customers here rate them {state.rival.stars.toFixed(1)} stars, and their prices are about{' '}
+              {Math.round(state.rival.priceIndex * 100)}% of the typical menu. They cut prices when yours are high and open a new store every few weeks.
+            </p>
+            <p className="muted small">A store in the same district as theirs shares its walk-ins with them. Better ratings and fair prices win more of them.</p>
+            <div className="dialog-actions">
+              <button className="btn btn-primary" onClick={() => setRivalLot(null)}>
                 Got it
               </button>
             </div>
@@ -329,7 +414,7 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
                   setView('store');
                 }}
               >
-                Go to {state.companyName}
+                Go to {lotById(ui.store.lotId).address}
               </button>
             </div>
             <label className="setting">

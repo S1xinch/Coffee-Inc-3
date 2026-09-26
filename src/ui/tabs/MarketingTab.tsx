@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { CAMPAIGNS, marketingTraffic, weeklyMarketingCost, type CampaignLevel } from '../../sim/marketing';
 import { formatMoney } from '../../sim/money';
-import { Card, Meter } from '../bits';
+import { districtShare, rivalStoresIn } from '../../sim/rival';
+import { storeDistrict } from '../../sim/store';
+import { Card, Meter, plural } from '../bits';
 import { useGameUi } from '../context';
 
 const ICONS: Record<string, ReactNode> = {
@@ -60,26 +62,64 @@ function cost(l: CampaignLevel): string {
   return '';
 }
 
+// How this district's walk-ins split between your stores and the rival chain.
+function RivalCard() {
+  const { state, store } = useGameUi();
+  const district = storeDistrict(store);
+  const share = districtShare(state, district.id);
+  const rivals = rivalStoresIn(state, district.id).length;
+  const pct = Math.round(share.yourShare * 100);
+  return (
+    <Card title={`${district.name} market`}>
+      {rivals === 0 ? (
+        <p className="muted small">
+          {state.rival.name} has no store in {district.name} yet. They run {plural(state.rival.stores.length, 'store')} elsewhere in town and open a new one every few weeks.
+        </p>
+      ) : (
+        <>
+          <div className="share-bar" role="img" aria-label={`You get about ${pct} percent of customers in ${district.name}, ${state.rival.name} gets the rest`}>
+            <span className="share-you" style={{ width: `${pct}%` }} />
+            <span className="share-rival" style={{ width: `${100 - pct}%` }} />
+          </div>
+          <div className="share-legend small">
+            <span>
+              <span className="swatch-dot share-you" /> You {pct}%
+            </span>
+            <span>
+              <span className="swatch-dot share-rival" /> {state.rival.name} {100 - pct}%
+            </span>
+          </div>
+          <p className="muted small">
+            {state.rival.name} has {plural(rivals, 'store')} here, rated {state.rival.stars.toFixed(1)} stars, and prices about {Math.round(state.rival.priceIndex * 100)}% of the typical menu.
+            Better ratings and fair prices win customers back.
+          </p>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export function MarketingTab() {
-  const { state, act } = useGameUi();
-  const boost = Math.round((marketingTraffic(state) - 1) * 100);
+  const { store, storeAct } = useGameUi();
+  const boost = Math.round((marketingTraffic(store) - 1) * 100);
 
   return (
     <div className="stack">
       <Card>
         <div className="meter-row">
           <span>Reputation</span>
-          <Meter value={state.store.reputation} label="Reputation" />
-          <span className="num">{Math.round(state.store.reputation)}</span>
+          <Meter value={store.reputation} label="Reputation" />
+          <span className="num">{Math.round(store.reputation)}</span>
         </div>
         <p className="muted small">
-          Spending {formatMoney(weeklyMarketingCost(state))} a week{boost > 0 ? `, bringing in ${boost}% more foot traffic` : ''}. Reputation decides how many people
+          Spending {formatMoney(weeklyMarketingCost(store))} a week{boost > 0 ? `, bringing in ${boost}% more foot traffic` : ''}. Reputation decides how many people
           walking by know your name. Tap a card to switch it on or off.
         </p>
       </Card>
+      <RivalCard />
       <div className="campaign-grid">
         {CAMPAIGNS.map((c) => {
-          const current = state.store.marketing[c.id] ?? 0;
+          const current = store.marketing[c.id] ?? 0;
           const level = c.levels[current]!;
           const next = (current + 1) % c.levels.length;
           const preview = c.levels[current === 0 ? 1 : current]!;
@@ -88,7 +128,7 @@ export function MarketingTab() {
               key={c.id}
               className={`campaign ${current > 0 ? 'on' : ''}`}
               aria-pressed={current > 0}
-              onClick={() => act({ type: 'setCampaign', campaignId: c.id, level: next })}
+              onClick={() => storeAct({ type: 'setCampaign', campaignId: c.id, level: next })}
             >
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 {ICONS[c.id]}

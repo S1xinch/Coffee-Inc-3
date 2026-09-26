@@ -563,6 +563,7 @@ input {
 }
 
 .stage-status {
+  pointer-events: none;
   position: absolute;
   left: 50%;
   bottom: 62px;
@@ -1659,4 +1660,85 @@ table.fin tr.strong td {
   .btn {
     transition: none;
   }
+}
+
+/* Phase 2: store switcher, arrange mode, rival share */
+.store-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.store-switch .btn-icon {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.fab.right2 {
+  right: 14px;
+  bottom: 80px;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+}
+
+.stage-canvas.arranging {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.arrange-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 12px;
+  background: rgba(24, 22, 21, 0.85);
+  color: #fff;
+  font-size: 14px;
+}
+
+.arrange-bar .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.share-bar {
+  display: flex;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.share-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--ink-2);
+}
+
+.share-you {
+  background: var(--blue);
+}
+
+.share-rival {
+  background: #d98b2b;
+}
+
+.share-legend .swatch-dot {
+  vertical-align: -1px;
 }

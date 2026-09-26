@@ -1,13 +1,17 @@
 # Coffee-Inc-3
 
-A coffee shop business sim that runs as an installable web app on iPhone and iPad (Safari, Add to Home Screen), laid out like Coffee Inc 2. Phase 1: one store, real bookkeeping, and offline progress.
+A coffee shop business sim that runs as an installable web app on iPhone and iPad (Safari, Add to Home Screen), laid out like Coffee Inc 2. Phase 2: a local chain of stores in a bigger city, with managers, custom layouts, and a rival chain.
 
 Play it at https://s1xinch.github.io/Coffee-Inc-3/ (deployed from `main` by GitHub Pages).
 
 ## What's in the game right now
 
-- An isometric city map as the home screen, with your store's pin and lots for lease.
-- Pick a logo, a brand color, and one of three neighborhoods. Each neighborhood has its own foot traffic, rent, and price sensitivity.
+- An isometric city map as the home screen: a 26×26 Seattle with a bay, a lake, piers, boats, a ferry, and six districts. Pins show your stores, the rival chain, and lots for lease.
+- Pick a logo, a brand color, and a district for your first store. Each district has its own foot traffic, rent, and price sensitivity.
+- Lease more lots to grow into a chain, switch between stores, and close ones that don't pay. Finance and the weekly report break results down by store.
+- Hire a manager per store. Managers answer incidents, repair equipment, and hire baristas, and their status is always current.
+- Move tables, armchairs, and plants around the floor with arrange mode.
+- A rival chain, Northline Coffee, competes for customers in the districts it's in, answers your prices, and keeps expanding.
 - A store screen with your staff talking to you, the café on its street corner, customer reviews (price, product, service, atmosphere), and Service, Product, Marketing, and Finance tabs.
 - Buy and upgrade counter equipment, seating, and decor. They all show up in the isometric store view.
 - Set menu prices, hire and train baristas, run six marketing campaigns, and handle events that pop up. Anything you ignore is settled automatically when its deadline passes.
@@ -33,7 +37,7 @@ If Playwright can't find its bundled Chromium, set `PW_CHROMIUM_PATH` to a Chrom
 
 ## Layout
 
-- `src/sim`: the framework-free, deterministic simulation (ledger, demand, staff, incidents, marketing, reviews, weekly close, saves)
+- `src/sim`: the framework-free, deterministic simulation (city map, ledger, demand, staff, managers, layouts, rival, incidents, marketing, reviews, weekly close, saves)
 - `src/worker`: the Web Worker that runs the game clock off the UI thread
 - `src/render`: the Canvas 2D isometric store and city renderers
 - `src/ui`: the React screens and tabs

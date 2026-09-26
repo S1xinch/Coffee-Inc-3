@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BRAND_COLORS, NEIGHBORHOODS, STARTING_CAPITAL } from '../sim/catalog';
+import { firstLotIn } from '../sim/city';
+import { lotRent } from '../sim/store';
 import { clockInfo } from '../sim/clock';
 import { newGame } from '../sim/game';
 import { formatMoney } from '../sim/money';
@@ -91,7 +93,7 @@ function Title({ existing, error, onContinue, onNew, onImport }: {
   );
 }
 
-function NewCompany({ hasExisting, onStart, onBack }: { hasExisting: boolean; onStart: (name: string, neighborhoodId: string, brand: GameState['brand']) => void; onBack: () => void }) {
+function NewCompany({ hasExisting, onStart, onBack }: { hasExisting: boolean; onStart: (name: string, districtId: string, brand: GameState['brand']) => void; onBack: () => void }) {
   const [name, setName] = useState('');
   const [hood, setHood] = useState(NEIGHBORHOODS[0]!.id);
   const [brand, setBrand] = useState<GameState['brand']>({ icon: 'cup', color: BRAND_COLORS[0] });
@@ -118,14 +120,16 @@ function NewCompany({ hasExisting, onStart, onBack }: { hasExisting: boolean; on
         </fieldset>
         <fieldset className="hoods">
           <legend>Where is your first store?</legend>
+          <p className="muted small">You can lease more lots in other districts later from the city map.</p>
           {NEIGHBORHOODS.map((n) => (
             <label key={n.id} className={`hood ${hood === n.id ? 'on' : ''}`}>
               <input type="radio" name="hood" value={n.id} checked={hood === n.id} onChange={() => setHood(n.id)} />
               <span className="hood-name">{n.name}</span>
+              <span className="muted small">{firstLotIn(n.id).address}</span>
               <span className="muted small">{n.blurb}</span>
               <span className="hood-stats small">
                 <span>{n.trafficPerHour} people pass by per hour</span>
-                <span>{formatMoney(n.weeklyRent)} rent per week</span>
+                <span>{formatMoney(lotRent(firstLotIn(n.id).id))} rent per week</span>
                 <span>Price sensitivity: {n.priceSensitivity >= 1.3 ? 'high' : n.priceSensitivity <= 0.8 ? 'low' : 'medium'}</span>
               </span>
             </label>
@@ -187,8 +191,8 @@ export function App() {
         <NewCompany
           hasExisting={screen.hasExisting}
           onBack={() => loadSave().then((r) => setScreen({ kind: 'title', existing: r.kind === 'ok' ? { state: r.state, savedAtMs: r.savedAtMs } : null, error: null }))}
-          onStart={async (name, neighborhoodId, brand) => {
-            const state = newGame({ companyName: name, neighborhoodId, brand, seed: Math.floor(Math.random() * 2 ** 32) });
+          onStart={async (name, districtId, brand) => {
+            const state = newGame({ companyName: name, districtId, brand, seed: Math.floor(Math.random() * 2 ** 32) });
             await writeSave(state).catch(() => undefined);
             startGame(state, Date.now(), true);
           }}

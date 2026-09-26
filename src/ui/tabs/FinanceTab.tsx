@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { LOAN_APR, LOAN_STEP } from '../../sim/catalog';
 import { clockInfo } from '../../sim/clock';
-import { currentWeekStatements } from '../../sim/ledger';
+import { lot } from '../../sim/city';
+import { currentWeekStatements, incomeStatement, storeEntries } from '../../sim/ledger';
 import { formatMoney } from '../../sim/money';
-import type { BalanceSheet, CashFlow, IncomeStatement } from '../../sim/state';
+import type { BalanceSheet, CashFlow, GameState, IncomeStatement } from '../../sim/state';
 import { loanBalance, loanLimit } from '../../sim/store';
 import { Money } from '../bits';
 import { useGameUi } from '../context';
@@ -42,6 +43,48 @@ function change(now: number, before: number | undefined): string {
   return `${diff >= 0 ? '+' : ''}${formatMoney(diff)}${pct} vs week before`;
 }
 
+// Each store's own books this week, plus last week's net income from the weekly report.
+function ByStore({ state }: { state: GameState }) {
+  if (state.stores.length < 2) return null;
+  const last = state.reports.at(-1);
+  const company = incomeStatement(state.ledger.journal.filter((e) => e.storeId === null));
+  return (
+    <>
+      <h2 className="section-title">By store</h2>
+      <table className="fin">
+        <thead>
+          <tr>
+            <th scope="col">This week so far</th>
+            <th scope="col">Sales</th>
+            <th scope="col">Net income</th>
+            {last && <th scope="col">Last week</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {state.stores.map((s) => {
+            const own = incomeStatement(storeEntries(state.ledger.journal, s.id));
+            const prev = last?.stores.find((r) => r.storeId === s.id);
+            return (
+              <tr key={s.id}>
+                <th scope="row">{lot(s.lotId).address}</th>
+                <td>{formatMoney(own.revenue)}</td>
+                <td>{formatMoney(own.netIncome)}</td>
+                {last && <td>{prev ? formatMoney(prev.netIncome) : 'New'}</td>}
+              </tr>
+            );
+          })}
+          <tr>
+            <th scope="row">Company (loan interest)</th>
+            <td />
+            <td>{formatMoney(company.netIncome)}</td>
+            {last && <td />}
+          </tr>
+        </tbody>
+      </table>
+    </>
+  );
+}
+
 export function FinanceTab() {
   const { state, act } = useGameUi();
   const [view, setView] = useState<View>('income');
@@ -78,6 +121,8 @@ export function FinanceTab() {
       </div>
 
       <ProfitChart reports={state.reports} />
+
+      <ByStore state={state} />
 
       <div className="segmented" role="tablist" aria-label="Financial statements">
         {(
@@ -224,7 +269,7 @@ export function FinanceTab() {
           </tr>
         </tbody>
       </table>
-      <p className="muted small">{Math.round(LOAN_APR * 100)}% a year, charged weekly. The limit grows with your reputation.</p>
+      <p className="muted small">{Math.round(LOAN_APR * 100)}% a year, charged weekly. The limit grows with your reputation and with every store you run.</p>
       <div className="row-actions">
         <button className="btn btn-small btn-primary" disabled={loan + LOAN_STEP > limit} onClick={() => act({ type: 'takeLoan', amount: LOAN_STEP })}>
           Borrow <Money cents={LOAN_STEP} />

@@ -9,7 +9,7 @@ async function startCompany(page: Page, name = 'Harbor Roast') {
   await page.goto('./');
   await page.getByRole('button', { name: 'New company' }).click();
   await page.getByLabel('Company name').fill(name);
-  await page.getByRole('radio', { name: 'leaf' }).click();
+  await page.getByRole('radio', { name: 'leaf', exact: true }).click();
   await page.getByText('University District').click();
   await page.getByRole('button', { name: 'Open the doors' }).click();
   await expect(page.getByText('Before you open')).toBeVisible();
@@ -46,8 +46,8 @@ test('opens a cafe, runs a day, and keeps it after a reload', async ({ page }) =
   await closeSheet(page);
 
   await page.getByRole('button', { name: 'Staff' }).first().click();
-  await page.getByRole('button', { name: 'Hire' }).first().click();
-  await page.getByRole('button', { name: 'Hire' }).first().click();
+  await page.getByRole('button', { name: 'Hire', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Hire', exact: true }).first().click();
   await expect(page.locator('.person', { hasText: 'Working' })).toHaveCount(2);
   await closeSheet(page);
 
@@ -89,25 +89,86 @@ test('opens a cafe, runs a day, and keeps it after a reload', async ({ page }) =
   await page.reload();
   await page.getByRole('button', { name: /Continue Harbor Roast/ }).click();
   await dismissPopups(page);
-  await pressHidden(page, 'Open Harbor Roast');
+  await pressHidden(page, 'Open your store at 4521 College Ave');
   await expect(page.getByRole('heading', { name: 'Harbor Roast' })).toBeVisible();
   await expect(page.getByText('Before you open')).toHaveCount(0);
 });
 
-test('shows lots for lease on the city map', async ({ page }) => {
-  await startCompany(page, 'Lot Scout');
+test('leases a second store, arranges furniture, and hires a manager', async ({ page }) => {
+  await startCompany(page, 'Two Cups');
+  await page.getByRole('button', { name: 'Customize' }).click();
+  const buy = (item: string) => page.locator('.shop-item', { hasText: item }).getByRole('button', { name: /Buy/ }).click();
+  await buy('Two-Top Table');
+  await buy('Potted Plant');
+  await closeSheet(page);
+
+  await page.getByRole('button', { name: 'Arrange furniture' }).click();
+  await expect(page.getByText('Tap a gold square to pick it up')).toBeVisible();
+  await snap(page, '08-arrange');
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  await page.getByRole('button', { name: 'Staff' }).first().click();
+  await page.getByRole('button', { name: /Hire a manager/ }).click();
+  await expect(page.getByRole('button', { name: 'Let go' }).first()).toBeVisible();
+  await closeSheet(page);
+  await expect(page.getByText('Store manager')).toBeVisible();
+
   await page.getByRole('button', { name: 'Back to the city map' }).click();
-  await pressHidden(page, 'Lot for lease in Downtown');
-  await expect(page.getByRole('dialog', { name: /For lease: Downtown/ })).toBeVisible();
-  await expect(page.getByText('330 people per hour')).toBeVisible();
+  await snap(page, '09-big-city');
+  await pressHidden(page, /Northline Coffee at 1 Ferry Terminal Way/);
+  await expect(page.getByRole('dialog', { name: 'Northline Coffee' })).toBeVisible();
   await page.getByRole('button', { name: 'Got it' }).click();
+
+  await pressHidden(page, /Lot for lease at 700 Pine Street/);
+  await expect(page.getByRole('dialog', { name: /For lease: 700 Pine Street/ })).toBeVisible();
+  await expect(page.getByText('330 people per hour')).toBeVisible();
+  await snap(page, '10-lease');
+  await page.getByRole('button', { name: /Lease this lot/ }).click();
+  await expect(page.locator('.shop-item', { hasText: 'Cash Register' })).toBeVisible();
+  await closeSheet(page);
+  await expect(page.getByText('700 Pine Street, Downtown')).toBeVisible();
+  await expect(page.getByText('2 of 2')).toBeVisible();
+  await page.getByRole('button', { name: 'Previous store' }).click();
+  await expect(page.getByText('4521 College Ave, University District')).toBeVisible();
+  await expect(page.getByText('Store manager')).toBeVisible();
+});
+
+test('moves furniture by tapping the floor', async ({ page }) => {
+  // Tap positions are measured on the iPhone layout.
+  test.skip(test.info().project.name !== 'iphone');
+  await page.goto('./');
+  await page.getByRole('button', { name: 'New company' }).click();
+  await page.getByLabel('Company name').fill('Tapper');
+  await page.getByRole('button', { name: 'Open the doors' }).click();
+  await page.getByRole('button', { name: 'Customize' }).click();
+  await page.locator('.shop-item', { hasText: 'Two-Top Table' }).getByRole('button', { name: /Buy/ }).click();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Arrange furniture' }).click();
+  const canvas = page.locator('.stage-canvas');
+  const box = (await canvas.boundingBox())!;
+  const before = await canvas.screenshot();
+  await canvas.click({ position: { x: 128 - box.x, y: 253 - box.y } });
+  await expect(page.getByText(/Tap a green square/)).toBeVisible();
+  await canvas.click({ position: { x: 150 - box.x, y: 283 - box.y } });
+  await page.waitForTimeout(300);
+  expect(await canvas.screenshot()).not.toEqual(before);
+  await expect(page.getByText('Tap a gold square to pick it up')).toBeVisible();
 });
 
 test('shows a weekly report after the first week closes', async ({ page }) => {
   test.setTimeout(180_000);
   await startCompany(page, 'Report Test');
   await page.getByRole('button', { name: 'Speed 4x' }).click();
-  await expect(page.getByRole('dialog', { name: /Week 1 results/ })).toBeVisible({ timeout: 150_000 });
+  const report = page.getByRole('dialog', { name: /Week 1 results/ });
+  await expect
+    .poll(
+      async () => {
+        await dismissPopups(page);
+        return report.isVisible();
+      },
+      { timeout: 150_000 },
+    )
+    .toBe(true);
   await snap(page, '07-week-report');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

@@ -12,17 +12,17 @@ export function run(state: GameState, ...cmds: Command[]): GameState {
   return s;
 }
 
-export function openStore(seed = 42, neighborhoodId = 'old-town'): GameState {
-  let s = newGame({ companyName: 'Test Beans', neighborhoodId, seed });
+export function openStore(seed = 42, districtId = 'old-town'): GameState {
+  let s = newGame({ companyName: 'Test Beans', districtId, seed });
   s = run(
     s,
-    { type: 'buyEquipment', typeId: 'register' },
-    { type: 'buyEquipment', typeId: 'espresso-1' },
-    { type: 'buyEquipment', typeId: 'drip' },
-    { type: 'buyEquipment', typeId: 'pastry' },
-    { type: 'buyEquipment', typeId: 'table' },
-    { type: 'buyEquipment', typeId: 'plant' },
+    { storeId: 'store1', type: 'buyEquipment', typeId: 'register' },
+    { storeId: 'store1', type: 'buyEquipment', typeId: 'espresso-1' },
+    { storeId: 'store1', type: 'buyEquipment', typeId: 'drip' },
+    { storeId: 'store1', type: 'buyEquipment', typeId: 'pastry' },
+    { storeId: 'store1', type: 'buyEquipment', typeId: 'table' },
+    { storeId: 'store1', type: 'buyEquipment', typeId: 'plant' },
   );
   const [a, b] = s.candidates;
-  return run(s, { type: 'hireStaff', candidateId: a!.id }, { type: 'hireStaff', candidateId: b!.id });
+  return run(s, { storeId: 'store1', type: 'hireStaff', candidateId: a!.id }, { storeId: 'store1', type: 'hireStaff', candidateId: b!.id });
 }
