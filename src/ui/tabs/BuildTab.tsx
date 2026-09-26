@@ -1,6 +1,6 @@
-import { EQUIPMENT, REPAIR_RATE, RESALE_RATE, SINGLE_UNIT_CATEGORIES, equipmentType, type EquipmentType } from '../../sim/catalog';
+import { EQUIPMENT, RESALE_RATE, SINGLE_UNIT_CATEGORIES, equipmentType, type EquipmentType } from '../../sim/catalog';
 import { formatMoney } from '../../sim/money';
-import { ambiancePoints, bookValue, equipmentIn } from '../../sim/store';
+import { ambiancePoints, bookValue, equipmentIn, repairCost } from '../../sim/store';
 import { Card, Money } from '../bits';
 import { useGameUi } from '../context';
 
@@ -11,7 +11,7 @@ const GROUPS: { title: string; categories: EquipmentType['category'][]; note?: s
 ];
 
 export function BuildTab() {
-  const { store, confirm, storeAct } = useGameUi();
+  const { state, store, confirm, storeAct } = useGameUi();
 
   const sell = async (equipmentId: string) => {
     const e = store.equipment.find((x) => x.id === equipmentId);
@@ -57,7 +57,7 @@ export function BuildTab() {
                   <div className="shop-actions">
                     {isCurrent && current?.broken && (
                       <button className="btn btn-small btn-primary" onClick={() => storeAct({ type: 'repairEquipment', equipmentId: current.id })}>
-                        Repair <Money cents={Math.round(t.cost * REPAIR_RATE)} />
+                        Repair <Money cents={repairCost(state, t.id)} />
                       </button>
                     )}
                     {(isCurrent || (!single && owned.length > 0)) && (

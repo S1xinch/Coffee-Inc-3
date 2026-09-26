@@ -2,6 +2,7 @@ import { dollars, formatMoney, type Cents } from './money';
 import { post } from './ledger';
 import { addLog } from './log';
 import { newId, pick, random } from './rng';
+import { deptLevel } from './hq';
 import { isWorking, readiness, workingEquipment } from './store';
 import type { GameState, PendingIncident, Staff, Store } from './state';
 
@@ -58,7 +59,8 @@ export const INCIDENTS: readonly IncidentDef[] = [
         cost: 0,
         apply: (s, st) => {
           const machine = workingEquipment(st, 'espresso');
-          if (machine && random(s) < 0.35) {
+          // Engineering's maintenance crews make breakdowns rarer.
+          if (machine && random(s) < 0.35 * (1 - 0.2 * deptLevel(s, 'engineering'))) {
             machine.broken = true;
             addLog(s, 'bad', 'The espresso machine broke down. Repair it from the Build tab.');
           } else {

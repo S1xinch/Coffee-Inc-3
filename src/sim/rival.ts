@@ -72,7 +72,7 @@ export function rivalWeek(state: GameState, weekNumber: number): void {
   rival.stars = Math.round(clamp(rival.stars + (random(state) - 0.5) * 0.2, 3.3, 4.3) * 100) / 100;
 
   if (weekNumber % RIVAL_EXPANSION_WEEKS === 0 && rival.stores.length < RIVAL_MAX_STORES) {
-    const free = LOTS.filter((l) => !lotTaken(state, l.id));
+    const free = LOTS.filter((l) => state.cities.includes(l.cityId) && !lotTaken(state, l.id));
     if (free.length > 0) {
       const pick = free[Math.floor(random(state) * free.length)]!;
       rival.stores.push({ lotId: pick.id, openedHour: state.hour });

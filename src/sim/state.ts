@@ -18,6 +18,12 @@ export const ACCOUNTS = [
   'repairs',
   'marketing',
   'otherExpense',
+  'inventory',
+  'farmland',
+  'investments',
+  'realEstate',
+  'shareCapital',
+  'dividends',
 ] as const;
 export type Account = (typeof ACCOUNTS)[number];
 
@@ -59,10 +65,15 @@ export const BalanceSheetSchema = z.object({
   cash: cents,
   equipmentAtCost: cents,
   accumDepreciation: cents,
+  inventory: cents.default(0),
+  farmland: cents.default(0),
+  investments: cents.default(0),
+  realEstate: cents.default(0),
   totalAssets: cents,
   loans: cents,
   totalLiabilities: cents,
   ownerCapital: cents,
+  shareCapital: cents.default(0),
   retainedEarnings: cents,
   totalEquity: cents,
 });
@@ -169,6 +180,7 @@ export const DayStatsSchema = z.object({
   capacitySum: z.number(),
   wagesAccrued: cents,
   marketingAccrued: cents,
+  feesAccrued: cents.default(0),
 });
 
 export const BRAND_ICONS = ['cup', 'bean', 'leaf', 'moon', 'wave', 'star'] as const;
@@ -218,6 +230,86 @@ export const RivalSchema = z.object({
   stars: z.number().min(1).max(5),
 });
 
+export const CITY_IDS = ['seattle', 'portland', 'san-francisco'] as const;
+export const DEPARTMENT_IDS = ['hr', 'finance', 'marketing', 'engineering', 'executive', 'investment'] as const;
+export type DepartmentId = (typeof DEPARTMENT_IDS)[number];
+
+export const ExecutiveSchema = z.object({
+  name: z.string(),
+  look: z.number().int().nonnegative(),
+  salary: cents,
+  hiredHour: z.number().int().nonnegative(),
+});
+
+const level = z.number().int().min(0).max(3);
+
+export const HqSchema = z.object({
+  open: z.boolean(),
+  openedHour: z.number().int().nullable(),
+  departments: z.object({ hr: level, finance: level, marketing: level, engineering: level, executive: level, investment: level }),
+  executives: z.object({
+    hr: ExecutiveSchema.nullable(),
+    finance: ExecutiveSchema.nullable(),
+    marketing: ExecutiveSchema.nullable(),
+    engineering: ExecutiveSchema.nullable(),
+    executive: ExecutiveSchema.nullable(),
+    investment: ExecutiveSchema.nullable(),
+  }),
+});
+
+export const BoardMeetingSchema = z.object({
+  week: z.number().int().positive(),
+  revenue: cents,
+  netIncome: cents,
+  targetRevenue: cents.nullable(),
+  targetNetIncome: cents.nullable(),
+  confidence: z.number().min(0).max(100),
+  note: z.string(),
+});
+
+export const BoardSchema = z.object({
+  confidence: z.number().min(0).max(100),
+  targetRevenue: cents.nullable(),
+  targetNetIncome: cents.nullable(),
+  meetings: z.array(BoardMeetingSchema),
+});
+
+export const PlantationSchema = z.object({
+  id: z.string(),
+  regionId: z.string(),
+  plots: z.number().int().min(1).max(8),
+  mill: z.boolean(),
+  cost: cents,
+  boughtHour: z.number().int().nonnegative(),
+  lastHarvestKg: z.number().nonnegative(),
+  lastWeather: z.string(),
+});
+
+export const BeansSchema = z.object({
+  kg: z.number().nonnegative(),
+  value: cents.nonnegative(),
+  quality: z.number().min(0).max(1),
+});
+
+const digits = z.string().regex(/^[0-9]+$/);
+
+export const MarketSchema = z.object({
+  beanPrice: cents.positive(),
+  stocks: z.record(z.string(), z.object({ price: cents.positive(), prev: cents.positive() })),
+  realEstateIndex: z.record(z.string(), z.number().positive()),
+});
+
+export const SharesSchema = z.object({
+  // Share counts are whole numbers kept as decimal strings and handled as BigInt, so they stay exact
+  // however many splits happen. Coffee Inc 2 crashed once share counts got very large.
+  total: digits,
+  owner: digits,
+  listed: z.boolean(),
+  price: cents.positive(),
+  listedHour: z.number().int().nullable(),
+  history: z.array(z.object({ week: z.number().int().nonnegative(), price: cents.positive() })),
+});
+
 export const GameStateSchema = z.object({
   companyName: z.string().min(1).max(40),
   brand: z.object({
@@ -241,6 +333,17 @@ export const GameStateSchema = z.object({
   modifiers: z.array(ModifierSchema),
   log: z.array(LogEntrySchema),
   rival: RivalSchema,
+  cities: z.array(z.enum(CITY_IDS)).min(1),
+  hq: HqSchema,
+  board: BoardSchema,
+  plantations: z.array(PlantationSchema),
+  beans: BeansSchema,
+  market: MarketSchema,
+  holdings: z.record(z.string(), z.object({ shares: z.number().int().nonnegative(), cost: cents.nonnegative() })),
+  properties: z.array(z.object({ propertyId: z.string(), cost: cents.nonnegative(), boughtHour: z.number().int().nonnegative() })),
+  shares: SharesSchema,
+  owner: z.object({ cash: cents.nonnegative() }),
+  settings: z.object({ politics: z.boolean() }),
   lifetime: z.object({
     served: z.number().int().nonnegative(),
     revenue: cents,
@@ -270,6 +373,12 @@ export type Store = z.infer<typeof StoreSchema>;
 export type Manager = z.infer<typeof ManagerSchema>;
 export type Cell = z.infer<typeof CellSchema>;
 export type Rival = z.infer<typeof RivalSchema>;
+export type Executive = z.infer<typeof ExecutiveSchema>;
+export type Hq = z.infer<typeof HqSchema>;
+export type BoardMeeting = z.infer<typeof BoardMeetingSchema>;
+export type Plantation = z.infer<typeof PlantationSchema>;
+export type Beans = z.infer<typeof BeansSchema>;
+export type Shares = z.infer<typeof SharesSchema>;
 
 export const emptyDayStats = (): DayStats => ({
   served: 0,
@@ -282,4 +391,5 @@ export const emptyDayStats = (): DayStats => ({
   capacitySum: 0,
   wagesAccrued: 0,
   marketingAccrued: 0,
+  feesAccrued: 0,
 });

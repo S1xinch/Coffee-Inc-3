@@ -1,9 +1,10 @@
-import { CITY_H, CITY_W, LOTS, PIERS, ROAD_X, ROAD_Y, isRoad, isWater, lot as lotById, zoneAt, type Zone } from '../sim/city';
-import { NEIGHBORHOODS } from '../sim/catalog';
+import { LOTS, city as cityById, isRoad, lot as lotById, type CityDef } from '../sim/city';
+import { districtsIn, neighborhood, type DistrictStyle } from '../sim/catalog';
 import type { BrandIcon } from '../sim/state';
 import { drawBrandIcon } from './brandIcons';
 
 export interface CityModel {
+  cityId: string;
   stores: readonly { id: string; lotId: string; alert: boolean }[];
   rivalLots: readonly string[];
   leaseLots: readonly string[];
@@ -36,7 +37,6 @@ interface Pin {
 
 const TW = 64;
 const TH = 32;
-const WORLD = { minX: -(CITY_H * TW) / 2 - 40, maxX: (CITY_W * TW) / 2 + 40, minY: -200, maxY: ((CITY_W + CITY_H) * TH) / 2 + 40 };
 const MAX_CACHE_PX = 12_000_000;
 const WATER = '#17abc8';
 
@@ -48,42 +48,53 @@ function hash(x: number, y: number, salt = 0): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-const PALETTES: Record<Zone, string[]> = {
+type Style = DistrictStyle | 'park';
+
+const PALETTES: Record<Style, string[]> = {
   park: ['#e9e2d2'],
-  downtown: ['#9fb8c8', '#8aa7ba', '#b9c7cf', '#7f97a8', '#c4ced3', '#aebfca'],
-  market: ['#9c5a47', '#8c6f5a', '#a8b2b8', '#b5654a'],
-  university: ['#b8674a', '#c27a55', '#a95c42'],
-  hillside: ['#e8d6b8', '#c9dbe3', '#e4c7c0', '#d8e3c8', '#f0e3c8'],
-  waterfront: ['#a8b2b8', '#c48a5c', '#8f9ca3', '#d6c7ae'],
-  'old-town': ['#b5654a', '#a55840', '#c47c5c', '#9c5a47', '#d6c7ae'],
+  towers: ['#9fb8c8', '#8aa7ba', '#b9c7cf', '#7f97a8', '#c4ced3', '#aebfca'],
+  warehouse: ['#9c5a47', '#8c6f5a', '#a8b2b8', '#b5654a'],
+  campus: ['#b8674a', '#c27a55', '#a95c42'],
+  houses: ['#e8d6b8', '#c9dbe3', '#e4c7c0', '#d8e3c8', '#f0e3c8'],
+  harbor: ['#a8b2b8', '#c48a5c', '#8f9ca3', '#d6c7ae'],
+  brick: ['#b5654a', '#a55840', '#c47c5c', '#9c5a47', '#d6c7ae'],
 };
 
-const HEIGHTS: Record<Zone, [number, number]> = {
+const HEIGHTS: Record<Style, [number, number]> = {
   park: [0, 0],
-  downtown: [70, 140],
-  market: [18, 30],
-  university: [22, 40],
-  hillside: [14, 22],
-  waterfront: [18, 34],
-  'old-town': [20, 42],
+  towers: [70, 140],
+  warehouse: [18, 30],
+  campus: [22, 40],
+  houses: [14, 22],
+  harbor: [18, 34],
+  brick: [20, 42],
 };
+
+const styleAt = (c: CityDef, x: number, y: number): Style => {
+  const zone = c.zone(x, y);
+  return zone === 'park' ? 'park' : neighborhood(zone).style;
+};
+
+const worldOf = (c: CityDef) => ({ minX: -(c.h * TW) / 2 - 40, maxX: (c.w * TW) / 2 + 40, minY: -200, maxY: ((c.w + c.h) * TH) / 2 + 40 });
 
 // Where each district's name sits on the map: the middle of its dry, non-road tiles.
-const LABELS: { name: string; at: Pt }[] = NEIGHBORHOODS.map((n) => {
-  let sx = 0;
-  let sy = 0;
-  let count = 0;
-  for (let y = 0; y < CITY_H; y++) {
-    for (let x = 0; x < CITY_W; x++) {
-      if (zoneAt(x, y) === n.id && !isWater(x, y) && !isRoad(x, y)) {
-        sx += x + 0.5;
-        sy += y + 0.5;
-        count++;
+function labelsOf(c: CityDef): { name: string; at: Pt }[] {
+  return districtsIn(c.id).map((n) => {
+    let sx = 0;
+    let sy = 0;
+    let count = 0;
+    for (let y = 0; y < c.h; y++) {
+      for (let x = 0; x < c.w; x++) {
+        if (c.zone(x, y) === n.id && !c.water(x, y) && !isRoad(c, x, y)) {
+          sx += x + 0.5;
+          sy += y + 0.5;
+          count++;
+        }
       }
     }
-  }
-  return { name: n.name, at: iso(sx / Math.max(1, count), sy / Math.max(1, count), 0) };
-});
+    return { name: n.name, at: iso(sx / Math.max(1, count), sy / Math.max(1, count), 0) };
+  });
+}
 
 function shade(hex: string, amount: number): string {
   const n = parseInt(hex.slice(1), 16);
@@ -204,6 +215,27 @@ function ferry(c: Ctx, x: number, y: number): void {
 
 const RIVAL_TEXT = '#ffffff';
 
+// A tall white pyramid tower, San Francisco's skyline landmark.
+function pyramid(c: Ctx, x: number, y: number): void {
+  const base = [iso(x + 0.1, y + 0.1), iso(x + 0.9, y + 0.1), iso(x + 0.9, y + 0.9), iso(x + 0.1, y + 0.9)];
+  const top = iso(x + 0.5, y + 0.5, 190);
+  poly(c, [base[3]!, base[2]!, top], '#e6e9ec');
+  poly(c, [base[2]!, base[1]!, top], '#c3c9ce');
+  c.strokeStyle = 'rgba(80, 96, 110, 0.35)';
+  c.lineWidth = 0.6;
+  for (let z = 14; z < 180; z += 12) {
+    const t = z / 190;
+    const l = { x: base[3]!.x + (top.x - base[3]!.x) * t, y: base[3]!.y + (top.y - base[3]!.y) * t };
+    const r = { x: base[1]!.x + (top.x - base[1]!.x) * t, y: base[1]!.y + (top.y - base[1]!.y) * t };
+    const m = { x: base[2]!.x + (top.x - base[2]!.x) * t, y: base[2]!.y + (top.y - base[2]!.y) * t };
+    c.beginPath();
+    c.moveTo(l.x, l.y);
+    c.lineTo(m.x, m.y);
+    c.lineTo(r.x, r.y);
+    c.stroke();
+  }
+}
+
 export class CityMap {
   private readonly ctx: Ctx;
   private readonly cache = document.createElement('canvas');
@@ -220,6 +252,9 @@ export class CityMap {
   private gesture: { startX: number; startY: number; t: number; moved: boolean; pinch: number | null; zoom0: number } | null = null;
   private raf = 0;
   private placed = false;
+  private c: CityDef = cityById('seattle');
+  private world = worldOf(this.c);
+  private cityLabels = labelsOf(this.c);
 
   constructor(private readonly canvas: HTMLCanvasElement, private readonly callbacks: CityCallbacks) {
     const ctx = canvas.getContext('2d');
@@ -253,20 +288,28 @@ export class CityMap {
   }
 
   setModel(model: CityModel): void {
+    const cityChanged = model.cityId !== this.c.id;
     const first = !this.model;
+    if (cityChanged) {
+      this.c = cityById(model.cityId);
+      this.world = worldOf(this.c);
+      this.cityLabels = labelsOf(this.c);
+      this.cacheKey = '';
+    }
+    const refocus = first || cityChanged || model.focusLotId !== this.model?.focusLotId;
     this.model = model;
-    if (first && this.width > 0) this.focus(model.focusLotId);
+    if (refocus && this.width > 0) this.focus(model.focusLotId);
     this.request();
   }
 
   private minZoom(): number {
-    return Math.min(this.width / (WORLD.maxX - WORLD.minX), this.height / (WORLD.maxY - WORLD.minY));
+    return Math.min(this.width / (this.world.maxX - this.world.minX), this.height / (this.world.maxY - this.world.minY));
   }
 
   focus(lotId: string): void {
-    const l = LOTS.find((x) => x.id === lotId);
-    if (!l) return;
-    const p = iso(l.x + 0.5, l.y + 0.5, 30);
+    const l = LOTS.find((x) => x.id === lotId && x.cityId === this.c.id);
+    // Without a lot to look at, frame the middle of the city.
+    const p = l ? iso(l.x + 0.5, l.y + 0.5, 30) : iso(this.c.w / 2, this.c.h / 2, 30);
     this.zoom = Math.max(this.minZoom(), Math.min(1.3, this.width / 360));
     this.camX = p.x;
     this.camY = p.y;
@@ -280,8 +323,8 @@ export class CityMap {
     const halfW = this.width / 2 / this.zoom;
     const halfH = this.height / 2 / this.zoom;
     const clampAxis = (v: number, lo: number, hi: number, half: number) => (hi - lo < half * 2 ? (lo + hi) / 2 : Math.min(hi - half, Math.max(lo + half, v)));
-    this.camX = clampAxis(this.camX, WORLD.minX, WORLD.maxX, halfW);
-    this.camY = clampAxis(this.camY, WORLD.minY, WORLD.maxY, halfH);
+    this.camX = clampAxis(this.camX, this.world.minX, this.world.maxX, halfW);
+    this.camY = clampAxis(this.camY, this.world.minY, this.world.maxY, halfH);
   }
 
   private toScreen(p: Pt): Pt {
@@ -384,10 +427,10 @@ export class CityMap {
     c.clearRect(0, 0, this.canvas.width, this.canvas.height);
     if (!m || this.width === 0) return;
 
-    const worldW = WORLD.maxX - WORLD.minX;
-    const worldH = WORLD.maxY - WORLD.minY;
+    const worldW = this.world.maxX - this.world.minX;
+    const worldH = this.world.maxY - this.world.minY;
     const wanted = Math.min(this.zoom * this.dpr, Math.sqrt(MAX_CACHE_PX / (worldW * worldH)));
-    const key = `${m.stores.map((s) => s.lotId).join(',')}|${m.rivalLots.join(',')}|${m.brandColor}|${m.hourOfDay}`;
+    const key = `${this.c.id}|${m.stores.map((s) => s.lotId).join(',')}|${m.rivalLots.join(',')}|${m.brandColor}|${m.hourOfDay}`;
     const gesturing = this.gesture?.pinch != null;
     if (key !== this.cacheKey || (!gesturing && Math.abs(wanted - this.cacheScale) > 0.01)) {
       this.cacheKey = key;
@@ -397,7 +440,7 @@ export class CityMap {
 
     c.fillStyle = WATER;
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    const tl = this.toScreen({ x: WORLD.minX, y: WORLD.minY });
+    const tl = this.toScreen({ x: this.world.minX, y: this.world.minY });
     c.imageSmoothingQuality = 'high';
     c.drawImage(this.cache, tl.x * this.dpr, tl.y * this.dpr, worldW * this.zoom * this.dpr, worldH * this.zoom * this.dpr);
 
@@ -413,7 +456,7 @@ export class CityMap {
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.lineJoin = 'round';
-    for (const l of LABELS) {
+    for (const l of this.cityLabels) {
       const p = this.toScreen({ x: l.at.x, y: l.at.y - 40 });
       const text = l.name.toUpperCase();
       c.lineWidth = 4;
@@ -489,22 +532,22 @@ export class CityMap {
 
   private paint(m: CityModel): void {
     const s = this.cacheScale;
-    this.cache.width = Math.ceil((WORLD.maxX - WORLD.minX) * s);
-    this.cache.height = Math.ceil((WORLD.maxY - WORLD.minY) * s);
+    this.cache.width = Math.ceil((this.world.maxX - this.world.minX) * s);
+    this.cache.height = Math.ceil((this.world.maxY - this.world.minY) * s);
     const c = this.cache.getContext('2d');
     if (!c) return;
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.fillStyle = WATER;
     c.fillRect(0, 0, this.cache.width, this.cache.height);
-    c.setTransform(s, 0, 0, s, -WORLD.minX * s, -WORLD.minY * s);
+    c.setTransform(s, 0, 0, s, -this.world.minX * s, -this.world.minY * s);
     const night = isNight(m.hourOfDay);
 
     const tiles: Pt[] = [];
-    for (let y = 0; y < CITY_H; y++) for (let x = 0; x < CITY_W; x++) tiles.push({ x, y });
+    for (let y = 0; y < this.c.h; y++) for (let x = 0; x < this.c.w; x++) tiles.push({ x, y });
     tiles.sort((a, b) => a.x + a.y - (b.x + b.y) || a.x - b.x);
 
     for (const { x, y } of tiles) this.ground(c, x, y);
-    for (const p of PIERS) box(c, p.x + 0.3, p.from - 0.2, p.x + 0.7, p.to + 0.9, 0, 4, '#a5825f');
+    for (const p of this.c.piers) box(c, p.x0, p.y0, p.x1, p.y1, 0, 4, '#a5825f');
     const own = new Map(m.stores.map((st) => [st.lotId, true]));
     const rival = new Set(m.rivalLots);
     for (const { x, y } of tiles) this.structure(c, x, y, m, night, own, rival);
@@ -517,21 +560,18 @@ export class CityMap {
     }
   }
 
-  // Boats tied up along the piers, a ferry at the terminal, and sailboats on the lake.
+  // Boats tied up along the piers, ferries at the terminals, and sailboats out on the water.
   private harbor(c: Ctx): void {
-    boat(c, 6.55, 23.2, '#c9573f', 0.9);
-    boat(c, 8.4, 22.6, '#3a6ea5', 0.8);
-    boat(c, 10.5, 24.3, '#f2efe8', 1.1);
-    boat(c, 12.4, 23.0, '#2f7a4a', 0.8);
-    ferry(c, 16.2, 23.6);
-    boat(c, 19.5, 24.5, '#6b6f78', 1.2);
-    sailboat(c, 4, 23.5);
-    sailboat(c, 22.4, 1.2);
-    sailboat(c, 24.3, 2.4);
-    sailboat(c, 1.2, 8.5);
+    for (const b of this.c.boats) {
+      if (b.kind === 'ferry') ferry(c, b.x, b.y);
+      else if (b.kind === 'sail') sailboat(c, b.x, b.y);
+      else boat(c, b.x, b.y, b.color ?? '#c9573f', b.length ?? 0.9);
+    }
   }
 
   private ground(c: Ctx, x: number, y: number): void {
+    const isWater = (xx: number, yy: number) => this.c.water(xx, yy);
+    const onRoad = (xx: number, yy: number) => isRoad(this.c, xx, yy);
     const quad = [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)];
     if (isWater(x, y)) {
       poly(c, quad, WATER);
@@ -545,18 +585,18 @@ export class CityMap {
         c.stroke();
       }
       // Roads cross narrow water on bridges.
-      if ((ROAD_X.includes(x) || ROAD_Y.includes(y)) && y < 21) {
-        const vertical = ROAD_X.includes(x);
+      if (this.c.bridge(x, y)) {
+        const vertical = this.c.roadX.includes(x) && !this.c.roadY.includes(y);
         const q = vertical ? [iso(x + 0.1, y), iso(x + 0.9, y), iso(x + 0.9, y + 1), iso(x + 0.1, y + 1)] : [iso(x, y + 0.1), iso(x + 1, y + 0.1), iso(x + 1, y + 0.9), iso(x, y + 0.9)];
         poly(c, q.map((p) => ({ x: p.x, y: p.y - 6 })), '#9aa0a3');
         poly(c, q.map((p) => ({ x: p.x, y: p.y - 6 })).slice(0, 2).concat(q.slice(0, 2).reverse()), '#6d7275');
       }
       return;
     }
-    if (isRoad(x, y)) {
+    if (onRoad(x, y)) {
       poly(c, quad, '#8e9396');
-      const roadX = ROAD_X.includes(x);
-      const roadY = ROAD_Y.includes(y);
+      const roadX = this.c.roadX.includes(x);
+      const roadY = this.c.roadY.includes(y);
       c.strokeStyle = 'rgba(255,255,255,0.7)';
       c.lineWidth = 1;
       c.setLineDash([4, 5]);
@@ -576,44 +616,49 @@ export class CityMap {
       c.setLineDash([]);
       return;
     }
-    const zone = zoneAt(x, y);
-    const green = zone === 'park' || zone === 'university' || zone === 'hillside';
+    const zone = styleAt(this.c, x, y);
+    const green = zone === 'park' || zone === 'campus' || zone === 'houses';
     const shore = isWater(x, y + 1) || isWater(x + 1, y) || isWater(x - 1, y) || isWater(x, y - 1);
-    poly(c, quad, shore && zone === 'waterfront' ? '#d9ccb0' : green ? '#9be36b' : '#e2e8dc');
+    poly(c, quad, shore && zone === 'harbor' ? '#d9ccb0' : green ? '#9be36b' : '#e2e8dc');
     // Mint curb along any edge that meets a road, as on the Coffee Inc 2 map.
     const curb = '#b3e79c';
     const edge = (a: Pt, b: Pt, cc: Pt, dd: Pt) => poly(c, [a, b, cc, dd], curb);
     const w = 0.12;
-    if (isRoad(x, y - 1)) edge(iso(x, y), iso(x + 1, y), iso(x + 1, y + w), iso(x, y + w));
-    if (isRoad(x, y + 1)) edge(iso(x, y + 1 - w), iso(x + 1, y + 1 - w), iso(x + 1, y + 1), iso(x, y + 1));
-    if (isRoad(x - 1, y)) edge(iso(x, y), iso(x + w, y), iso(x + w, y + 1), iso(x, y + 1));
-    if (isRoad(x + 1, y)) edge(iso(x + 1 - w, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x + 1 - w, y + 1));
+    if (onRoad(x, y - 1)) edge(iso(x, y), iso(x + 1, y), iso(x + 1, y + w), iso(x, y + w));
+    if (onRoad(x, y + 1)) edge(iso(x, y + 1 - w), iso(x + 1, y + 1 - w), iso(x + 1, y + 1), iso(x, y + 1));
+    if (onRoad(x - 1, y)) edge(iso(x, y), iso(x + w, y), iso(x + w, y + 1), iso(x, y + 1));
+    if (onRoad(x + 1, y)) edge(iso(x + 1 - w, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x + 1 - w, y + 1));
     // Seawall where land meets the bay.
     if (isWater(x, y + 1)) poly(c, [iso(x, y + 1), iso(x + 1, y + 1), iso(x + 1, y + 1, -8), iso(x, y + 1, -8)], '#8b8478');
     if (isWater(x + 1, y)) poly(c, [iso(x + 1, y), iso(x + 1, y + 1), iso(x + 1, y + 1, -8), iso(x + 1, y, -8)], '#766f64');
   }
 
   private structure(c: Ctx, x: number, y: number, m: CityModel, night: boolean, own: Map<string, boolean>, rival: Set<string>): void {
-    if (isWater(x, y) || isRoad(x, y)) return;
-    const l = LOTS.find((k) => k.x === x && k.y === y);
+    if (this.c.water(x, y) || isRoad(this.c, x, y)) return;
+    const l = LOTS.find((k) => k.cityId === this.c.id && k.x === x && k.y === y);
     if (l) {
       if (own.has(l.id)) this.cafe(c, x, y, m.brandColor, night);
       else if (rival.has(l.id)) this.cafe(c, x, y, m.rivalColor, night);
       else this.vacantLot(c, x, y);
       return;
     }
-    const zone = zoneAt(x, y);
+    const zone = styleAt(this.c, x, y);
     const r = hash(x, y, 1);
-    if (zone === 'park') {
-      if (x === 11 && y === 3) tower(c, 11.5, 3.5);
-      else if (r > 0.3) tree(c, x + 0.5, y + 0.5, 1);
+    const landmark = this.c.landmark;
+    if (landmark && landmark.x === x && landmark.y === y) {
+      if (landmark.kind === 'needle') tower(c, x + 0.5, y + 0.5);
+      else pyramid(c, x, y);
       return;
     }
-    if ((zone === 'university' || zone === 'hillside') && r > 0.7) {
+    if (zone === 'park') {
+      if (r > 0.3) tree(c, x + 0.5, y + 0.5, 1);
+      return;
+    }
+    if ((zone === 'campus' || zone === 'houses') && r > 0.7) {
       tree(c, x + 0.3 + hash(x, y, 2) * 0.4, y + 0.5, 0.9);
       return;
     }
-    if (zone !== 'downtown' && r > 0.9) {
+    if (zone !== 'towers' && r > 0.9) {
       tree(c, x + 0.5, y + 0.5, 0.8);
       return;
     }
@@ -621,7 +666,7 @@ export class CityMap {
     const color = palette[Math.floor(hash(x, y, 3) * palette.length)]!;
     const [lo, hi] = HEIGHTS[zone];
     const h = Math.round(lo + (hi - lo) * hash(x, y, 4));
-    if (zone === 'market') {
+    if (zone === 'warehouse') {
       // Long warehouses with sawtooth roofs.
       box(c, x + 0.06, y + 0.12, x + 0.94, y + 0.88, 0, h, color);
       for (let i = 0; i < 3; i++) {
@@ -632,14 +677,14 @@ export class CityMap {
       poly(c, [iso(x + 0.3, y + 0.88, 2), iso(x + 0.7, y + 0.88, 2), iso(x + 0.7, y + 0.88, h * 0.6), iso(x + 0.3, y + 0.88, h * 0.6)], night ? '#ffd98a' : '#5a4638');
       return;
     }
-    const inset = zone === 'hillside' ? 0.2 : 0.1;
+    const inset = zone === 'houses' ? 0.2 : 0.1;
     box(c, x + inset, y + inset, x + 1 - inset, y + 1 - inset, 0, h, color);
-    if (zone === 'hillside') {
+    if (zone === 'houses') {
       poly(c, [iso(x + inset, y + 1 - inset, h), iso(x + 1 - inset, y + 1 - inset, h), iso(x + 0.5, y + 0.5, h + 9)], shade('#8f5a44', 0.05));
       poly(c, [iso(x + 1 - inset, y + inset, h), iso(x + 1 - inset, y + 1 - inset, h), iso(x + 0.5, y + 0.5, h + 9)], '#7a4a38');
       return;
     }
-    const glass = zone === 'downtown' ? '#5f7d92' : '#6f7f88';
+    const glass = zone === 'towers' ? '#5f7d92' : '#6f7f88';
     windows(c, x + inset, y + inset, x + 1 - inset, y + 1 - inset, h, glass, (i) => night && hash(x * 31 + i, y, 5) > 0.55);
     if (h > 90) box(c, x + 0.4, y + 0.4, x + 0.6, y + 0.6, h, h + 6, '#9aa4ab');
   }

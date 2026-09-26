@@ -90,20 +90,27 @@ const INCOME_ACCOUNTS: readonly Account[] = [
 
 export function balanceSheet(state: GameState): BalanceSheet {
   const b = balances(state);
-  const retainedEarnings = -INCOME_ACCOUNTS.reduce((sum, a) => sum + b[a], 0);
-  const totalAssets = b.cash + b.equipment + b.accumDepreciation;
+  // Dividends are paid out of retained earnings, so they reduce it directly.
+  const retainedEarnings = -INCOME_ACCOUNTS.reduce((sum, a) => sum + b[a], 0) - b.dividends;
+  const totalAssets = b.cash + b.equipment + b.accumDepreciation + b.inventory + b.farmland + b.investments + b.realEstate;
   const loans = -b.loans;
   const ownerCapital = -b.ownerCapital;
+  const shareCapital = -b.shareCapital;
   return {
     cash: b.cash,
     equipmentAtCost: b.equipment,
     accumDepreciation: b.accumDepreciation,
+    inventory: b.inventory,
+    farmland: b.farmland,
+    investments: b.investments,
+    realEstate: b.realEstate,
     totalAssets,
     loans,
     totalLiabilities: loans,
     ownerCapital,
+    shareCapital,
     retainedEarnings,
-    totalEquity: ownerCapital + retainedEarnings,
+    totalEquity: ownerCapital + shareCapital + retainedEarnings,
   };
 }
 

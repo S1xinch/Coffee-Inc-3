@@ -1,6 +1,6 @@
 # Coffee-Inc-3
 
-A coffee shop business sim that runs as an installable web app on iPhone and iPad (Safari, Add to Home Screen), laid out like Coffee Inc 2. Phase 2: a local chain of stores in a bigger city, with managers, custom layouts, and a rival chain.
+A coffee shop business sim that runs as an installable web app on iPhone and iPad (Safari, Add to Home Screen), laid out like Coffee Inc 2. Phase 3: a coffee company across three cities, with headquarters, plantations, investments, and a stock listing.
 
 Play it at https://s1xinch.github.io/Coffee-Inc-3/ (deployed from `main` by GitHub Pages).
 
@@ -11,6 +11,10 @@ Play it at https://s1xinch.github.io/Coffee-Inc-3/ (deployed from `main` by GitH
 - Lease more lots to grow into a chain, switch between stores, and close ones that don't pay. Finance and the weekly report break results down by store.
 - Hire a manager per store. Managers answer incidents, repair equipment, and hire baristas, and their status is always current.
 - Move tables, armchairs, and plants around the floor with arrange mode.
+- Expand to Portland and San Francisco. Each city has its own map, wages, fees, and fines, all from one rules table, and fines can be switched off with the local politics setting.
+- Open a headquarters with six departments, hire a C-suite, and meet the board every quarter.
+- Buy coffee farms in seven growing regions. Harvests fill a bean warehouse that your stores use first.
+- Invest in stocks and real estate, buy your stores' buildings, take the company public, split shares, and pay dividends to yourself and other shareholders.
 - A rival chain, Northline Coffee, competes for customers in the districts it's in, answers your prices, and keeps expanding.
 - A store screen with your staff talking to you, the café on its street corner, customer reviews (price, product, service, atmosphere), and Service, Product, Marketing, and Finance tabs.
 - Buy and upgrade counter equipment, seating, and decor. They all show up in the isometric store view.
@@ -37,7 +41,7 @@ If Playwright can't find its bundled Chromium, set `PW_CHROMIUM_PATH` to a Chrom
 
 ## Layout
 
-- `src/sim`: the framework-free, deterministic simulation (city map, ledger, demand, staff, managers, layouts, rival, incidents, marketing, reviews, weekly close, saves)
+- `src/sim`: the framework-free, deterministic simulation (cities and rules, ledger, demand, staff, managers, layouts, rival, headquarters, plantations, markets, incidents, marketing, reviews, weekly close, saves)
 - `src/worker`: the Web Worker that runs the game clock off the UI thread
 - `src/render`: the Canvas 2D isometric store and city renderers
 - `src/ui`: the React screens and tabs

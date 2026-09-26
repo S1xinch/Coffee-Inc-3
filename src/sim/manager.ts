@@ -1,8 +1,8 @@
-import { FIRST_NAMES, LAST_NAMES, MANAGER_SALARY, MAX_STAFF, RECRUITING_COST, REPAIR_RATE, equipmentType } from './catalog';
+import { FIRST_NAMES, LAST_NAMES, MANAGER_SALARY, MAX_STAFF, RECRUITING_COST, equipmentType } from './catalog';
 import { cashBalance, post } from './ledger';
 import { addLog } from './log';
 import { newId, pick, randomInt } from './rng';
-import { baristaRate, readiness } from './store';
+import { baristaRate, cityWage, readiness, repairCost } from './store';
 import { refreshCandidates } from './staff';
 import type { GameState, Manager, Store } from './state';
 
@@ -43,7 +43,7 @@ export function managerMorning(state: GameState, store: Store): void {
 
   for (const e of store.equipment.filter((x) => x.broken)) {
     const t = equipmentType(e.typeId);
-    const cost = Math.round(t.cost * REPAIR_RATE);
+    const cost = repairCost(state, e.typeId);
     if (cashBalance(state) < cost + CASH_BUFFER) continue;
     post(state, `Repaired ${t.name}`, 'operating', [['repairs', cost], ['cash', -cost]], store.id);
     e.broken = false;
@@ -62,7 +62,7 @@ export function managerMorning(state: GameState, store: Store): void {
       id: newId(state, 's'),
       name: best.name,
       skill: best.skill,
-      wage: best.askingWage,
+      wage: cityWage(store, best.askingWage),
       morale: 70,
       hiredHour: state.hour,
       trainingUntilHour: null,
@@ -87,7 +87,7 @@ export function managerStatus(state: GameState, store: Store): ManagerStatus | n
   const ready = readiness(state, store);
   if (!ready.register) return { state: 'needsAttention', note: 'We need a cash register. Managers cannot buy equipment.' };
   const broken = store.equipment.find((e) => e.broken);
-  if (broken && cashBalance(state) < Math.round(equipmentType(broken.typeId).cost * REPAIR_RATE) + CASH_BUFFER) {
+  if (broken && cashBalance(state) < repairCost(state, broken.typeId) + CASH_BUFFER) {
     return { state: 'needsAttention', note: `The ${equipmentType(broken.typeId).name} is broken and cash is too tight for me to fix it.` };
   }
   if (broken) return { state: 'repairing', note: `I'll get the ${equipmentType(broken.typeId).name} repaired first thing tomorrow.` };

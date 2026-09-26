@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LOTS } from '../sim/city';
+import { city, lot, lotsIn } from '../sim/city';
+
+const cityName = (id: string) => city(id).name;
 import { managerStatus } from '../sim/manager';
 import { RIVAL_COLOR, lotTaken } from '../sim/rival';
 import type { GameState } from '../sim/state';
@@ -8,13 +10,14 @@ import { CityMap, type CityModel } from '../render/city';
 
 interface Props {
   state: GameState;
+  cityId: string;
   focusLotId: string;
   onOpenStore: (storeId: string) => void;
   onLot: (lotId: string) => void;
   onRival: (lotId: string) => void;
 }
 
-export function CityView({ state, focusLotId, onOpenStore, onLot, onRival }: Props) {
+export function CityView({ state, cityId, focusLotId, onOpenStore, onLot, onRival }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const map = useRef<CityMap | null>(null);
   const handlers = useRef({ onOpenStore, onLot, onRival });
@@ -23,19 +26,23 @@ export function CityView({ state, focusLotId, onOpenStore, onLot, onRival }: Pro
 
   const hourOfDay = state.hour % 24;
   // A store pin gets a badge when it needs the owner: a manager asking for help, an open incident, or a store that cannot open.
-  const stores = state.stores.map((s) => ({
+  const inCity = (lotId: string) => lot(lotId).cityId === cityId;
+  const unlocked = state.cities.includes(cityId as GameState['cities'][number]);
+  const stores = state.stores.filter((s) => inCity(s.lotId)).map((s) => ({
     id: s.id,
     lotId: s.lotId,
     alert: managerStatus(state, s)?.state === 'needsAttention' || state.incidents.some((i) => i.storeId === s.id) || !readiness(state, s).ready,
   }));
   const storesKey = stores.map((s) => `${s.id}@${s.lotId}:${s.alert}`).join(',');
   const rivalKey = state.rival.stores.map((r) => r.lotId).join(',');
+  const leaseKey = unlocked ? lotsIn(cityId).filter((l) => !lotTaken(state, l.id)).map((l) => l.id).join(',') : '';
 
   const model = useMemo<CityModel>(
     () => ({
+      cityId,
       stores,
-      rivalLots: state.rival.stores.map((r) => r.lotId),
-      leaseLots: LOTS.filter((l) => !lotTaken(state, l.id)).map((l) => l.id),
+      rivalLots: state.rival.stores.map((r) => r.lotId).filter(inCity),
+      leaseLots: leaseKey ? leaseKey.split(',') : [],
       rivalColor: RIVAL_COLOR,
       brandIcon: state.brand.icon,
       brandColor: state.brand.color,
@@ -43,7 +50,7 @@ export function CityView({ state, focusLotId, onOpenStore, onLot, onRival }: Pro
       focusLotId,
     }),
     // Keys stand in for the arrays so the map only repaints when something visible changes.
-    [storesKey, rivalKey, state.brand.icon, state.brand.color, hourOfDay, focusLotId],
+    [cityId, storesKey, rivalKey, leaseKey, state.brand.icon, state.brand.color, hourOfDay, focusLotId],
   );
 
   useEffect(() => {
@@ -85,5 +92,5 @@ export function CityView({ state, focusLotId, onOpenStore, onLot, onRival }: Pro
       </div>
     );
   }
-  return <canvas ref={canvas} className="city-canvas" aria-label="Map of Seattle with your stores, the rival chain, and lots for lease" role="img" />;
+  return <canvas ref={canvas} className="city-canvas" aria-label={`Map of ${cityName(cityId)} with your stores, the rival chain, and lots for lease`} role="img" />;
 }

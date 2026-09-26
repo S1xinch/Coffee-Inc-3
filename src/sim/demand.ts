@@ -1,4 +1,6 @@
 import { DAY_TRAFFIC, MENU, TRAFFIC_CURVE, equipmentType, type MenuCategory, type MenuItem } from './catalog';
+import { deptLevel } from './hq';
+import { BASE_BEAN_PRICE, BEAN_KG, takeBeans } from './plantations';
 import { marketingTraffic } from './marketing';
 import { competitionFactor } from './rival';
 import { random } from './rng';
@@ -20,7 +22,10 @@ export interface HourSales {
   served: number;
   lost: number;
   revenue: number;
+  // Cost of goods paid in cash this hour, and the cost of beans taken from your own warehouse.
   cogs: number;
+  inventoryCogs: number;
+  drinks: number;
   capacity: number;
   qualitySum: number;
   priceRatioSum: number;
@@ -77,6 +82,7 @@ export function expectedVisitors(state: GameState, store: Store): number {
     awareness *
     trafficBoost(state, store) *
     marketingTraffic(store) *
+    (1 + 0.04 * deptLevel(state, 'marketing')) *
     competitionFactor(state, store)
   );
 }
@@ -85,7 +91,7 @@ export function simulateHourSales(state: GameState, store: Store): HourSales {
   const drinks = offers(state, store, true);
   const noise = 0.9 + 0.2 * random(state);
   const capacity = serviceCapacity(state, store);
-  const empty: HourSales = { demand: 0, served: 0, lost: 0, revenue: 0, cogs: 0, capacity, qualitySum: 0, priceRatioSum: 0, sold: {} };
+  const empty: HourSales = { demand: 0, served: 0, lost: 0, revenue: 0, cogs: 0, inventoryCogs: 0, drinks: 0, capacity, qualitySum: 0, priceRatioSum: 0, sold: {} };
   if (drinks.length === 0) return empty;
 
   const offeredPopularity = drinks.reduce((s, d) => s + d.item.popularity, 0);
@@ -119,12 +125,14 @@ export function simulateHourSales(state: GameState, store: Store): HourSales {
   let rawCogs = 0;
   let qualitySum = 0;
   let priceRatioSum = 0;
+  let beanKg = 0;
   drinks.forEach((d, i) => {
     const n = counts[i] ?? 0;
     if (n === 0) return;
     sold[d.item.id] = n;
     revenue += n * d.price;
     rawCogs += n * d.item.unitCost;
+    beanKg += n * (BEAN_KG[d.item.id] ?? 0);
     qualitySum += n * d.quality;
     priceRatioSum += n * Math.min(d.priceRatio, 2);
   });
@@ -143,12 +151,20 @@ export function simulateHourSales(state: GameState, store: Store): HourSales {
     });
   }
 
+  // Menu costs assume beans at the base price. Beans come from your warehouse first, at what
+  // they cost you; the rest are bought at today's market price.
+  const own = takeBeans(state, beanKg);
+  const bought = beanKg - own.kg;
+  const cashCogs = rawCogs - beanKg * BASE_BEAN_PRICE + bought * state.market.beanPrice;
+
   return {
     demand,
     served,
     lost: Math.max(0, demand - served),
     revenue,
-    cogs: Math.round(rawCogs * supplierCostMultiplier(state, store)),
+    cogs: Math.max(0, Math.round(cashCogs * supplierCostMultiplier(state, store))),
+    inventoryCogs: own.cost,
+    drinks: served,
     capacity,
     qualitySum,
     priceRatioSum,

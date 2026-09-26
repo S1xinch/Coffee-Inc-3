@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { LOAN_APR, LOAN_STEP } from '../../sim/catalog';
+import { LOAN_STEP } from '../../sim/catalog';
 import { clockInfo } from '../../sim/clock';
 import { lot } from '../../sim/city';
 import { currentWeekStatements, incomeStatement, storeEntries } from '../../sim/ledger';
 import { formatMoney } from '../../sim/money';
 import type { BalanceSheet, CashFlow, GameState, IncomeStatement } from '../../sim/state';
-import { loanBalance, loanLimit } from '../../sim/store';
+import { loanApr, loanBalance, loanLimit } from '../../sim/store';
 import { Money } from '../bits';
 import { useGameUi } from '../context';
 import { NET_COLOR, ProfitChart, REVENUE_COLOR } from './ProfitChart';
@@ -207,9 +207,14 @@ export function FinanceTab() {
                 ['Cash', (c) => c.balance?.cash],
                 ['Equipment at cost', (c) => c.balance?.equipmentAtCost],
                 ['Accumulated depreciation', (c) => c.balance?.accumDepreciation],
+                ['Bean inventory', (c) => c.balance?.inventory],
+                ['Farmland', (c) => c.balance?.farmland],
+                ['Stock investments', (c) => c.balance?.investments],
+                ['Real estate', (c) => c.balance?.realEstate],
                 ['Total assets', (c) => c.balance?.totalAssets, 'total'],
                 ['Bank loans', (c) => c.balance?.loans],
                 ['Owner capital', (c) => c.balance?.ownerCapital],
+                ['Share capital', (c) => c.balance?.shareCapital],
                 ['Retained earnings', (c) => c.balance?.retainedEarnings],
                 ['Liabilities and equity', (c) => (c.balance ? c.balance.totalLiabilities + c.balance.totalEquity : undefined), 'total'],
               ]}
@@ -264,12 +269,12 @@ export function FinanceTab() {
           <tr>
             <th scope="row">Interest per week</th>
             <td>
-              <Money cents={Math.round((loan * LOAN_APR) / 52)} />
+              <Money cents={Math.round((loan * loanApr(state)) / 52)} />
             </td>
           </tr>
         </tbody>
       </table>
-      <p className="muted small">{Math.round(LOAN_APR * 100)}% a year, charged weekly. The limit grows with your reputation and with every store you run.</p>
+      <p className="muted small">{(loanApr(state) * 100).toFixed(1)}% a year, charged weekly. The limit grows with your reputation, with every store you run, and with a Finance department at headquarters.</p>
       <div className="row-actions">
         <button className="btn btn-small btn-primary" disabled={loan + LOAN_STEP > limit} onClick={() => act({ type: 'takeLoan', amount: LOAN_STEP })}>
           Borrow <Money cents={LOAN_STEP} />

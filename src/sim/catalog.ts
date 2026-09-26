@@ -24,67 +24,49 @@ export const LOG_KEPT = 80;
 export const MANAGER_SALARY = dollars(1_100);
 export const LEASE_SIGNING_WEEKS = 1;
 
-export const CITY_NAME = 'Seattle';
+export type DistrictStyle = 'towers' | 'brick' | 'campus' | 'warehouse' | 'harbor' | 'houses';
 
 export interface Neighborhood {
   id: string;
+  cityId: string;
   name: string;
   blurb: string;
+  style: DistrictStyle;
   trafficPerHour: number;
   weeklyRent: Cents;
   priceSensitivity: number;
 }
 
+const district = (cityId: string, id: string, name: string, style: DistrictStyle, trafficPerHour: number, rent: number, priceSensitivity: number, blurb: string): Neighborhood => ({
+  id,
+  cityId,
+  name,
+  blurb,
+  style,
+  trafficPerHour,
+  weeklyRent: dollars(rent),
+  priceSensitivity,
+});
+
 export const NEIGHBORHOODS: readonly Neighborhood[] = [
-  {
-    id: 'old-town',
-    name: 'Old Town',
-    blurb: 'Quiet brick streets and loyal locals. Cheapest lease, slowest foot traffic.',
-    trafficPerHour: 200,
-    weeklyRent: dollars(1_100),
-    priceSensitivity: 1.0,
-  },
-  {
-    id: 'hillside',
-    name: 'Hillside',
-    blurb: 'Leafy streets of houses. Neighbors who come back every day.',
-    trafficPerHour: 180,
-    weeklyRent: dollars(950),
-    priceSensitivity: 1.2,
-  },
-  {
-    id: 'university',
-    name: 'University District',
-    blurb: 'Busy all day with students who watch every dollar.',
-    trafficPerHour: 260,
-    weeklyRent: dollars(1_500),
-    priceSensitivity: 1.6,
-  },
-  {
-    id: 'market',
-    name: 'Market District',
-    blurb: 'Old warehouses turned into food halls and studios.',
-    trafficPerHour: 240,
-    weeklyRent: dollars(1_700),
-    priceSensitivity: 1.1,
-  },
-  {
-    id: 'waterfront',
-    name: 'Waterfront',
-    blurb: 'Ferry commuters and tourists walking the piers.',
-    trafficPerHour: 290,
-    weeklyRent: dollars(2_200),
-    priceSensitivity: 0.9,
-  },
-  {
-    id: 'downtown',
-    name: 'Downtown',
-    blurb: 'Office crowds with big morning rushes. Premium lease.',
-    trafficPerHour: 330,
-    weeklyRent: dollars(3_000),
-    priceSensitivity: 0.7,
-  },
+  district('seattle', 'old-town', 'Old Town', 'brick', 200, 1_100, 1.0, 'Quiet brick streets and loyal locals. Cheapest lease, slowest foot traffic.'),
+  district('seattle', 'hillside', 'Hillside', 'houses', 180, 950, 1.2, 'Leafy streets of houses. Neighbors who come back every day.'),
+  district('seattle', 'university', 'University District', 'campus', 260, 1_500, 1.6, 'Busy all day with students who watch every dollar.'),
+  district('seattle', 'market', 'Market District', 'warehouse', 240, 1_700, 1.1, 'Old warehouses turned into food halls and studios.'),
+  district('seattle', 'waterfront', 'Waterfront', 'harbor', 290, 2_200, 0.9, 'Ferry commuters and tourists walking the piers.'),
+  district('seattle', 'downtown', 'Downtown', 'towers', 330, 3_000, 0.7, 'Office crowds with big morning rushes. Premium lease.'),
+  district('portland', 'pearl', 'Pearl District', 'warehouse', 250, 1_600, 1.0, 'Converted warehouses full of galleries and lofts.'),
+  district('portland', 'pdx-downtown', 'Downtown Portland', 'towers', 300, 2_300, 0.8, 'Office towers and food carts on every corner.'),
+  district('portland', 'alberta', 'Alberta Arts', 'houses', 190, 900, 1.3, 'Murals, bungalows, and neighbors on bikes.'),
+  district('portland', 'hawthorne', 'Hawthorne', 'brick', 220, 1_050, 1.2, 'Vintage shops and a crowd that knows its roasts.'),
+  district('san-francisco', 'financial', 'Financial District', 'towers', 380, 4_200, 0.6, 'Bankers who never ask the price. The most expensive leases in the game.'),
+  district('san-francisco', 'north-beach', 'North Beach', 'brick', 260, 2_600, 0.9, 'Old espresso bars and late nights.'),
+  district('san-francisco', 'embarcadero', 'Embarcadero', 'harbor', 340, 3_600, 0.8, 'Ferry crowds along the bay.'),
+  district('san-francisco', 'mission', 'Mission District', 'warehouse', 300, 2_400, 1.2, 'Sunny, busy, and full of coffee snobs.'),
+  district('san-francisco', 'sunset', 'Sunset', 'houses', 210, 1_700, 1.3, 'Foggy rows of houses near the ocean.'),
 ];
+
+export const districtsIn = (cityId: string): Neighborhood[] => NEIGHBORHOODS.filter((n) => n.cityId === cityId);
 
 export type EquipmentCategory =
   | 'register'

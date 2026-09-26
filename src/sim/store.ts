@@ -4,6 +4,8 @@ import {
   MENU,
   MENU_CATEGORY_EQUIPMENT,
   OPEN_HOUR,
+  LOAN_APR,
+  REPAIR_RATE,
   RESALE_RATE,
   equipmentType,
   neighborhood,
@@ -11,7 +13,9 @@ import {
   type MenuItem,
   type Neighborhood,
 } from './catalog';
-import { lot, type Lot } from './city';
+import { city, lot, type CityDef, type Lot } from './city';
+import { deptLevel } from './hq';
+import { MARKET_BEAN_QUALITY } from './plantations';
 import { balances, post } from './ledger';
 import { dollars, type Cents } from './money';
 import type { Equipment, GameState, Modifier, Staff, Store } from './state';
@@ -23,6 +27,7 @@ export function storeById(state: GameState, id: string): Store | undefined {
 }
 
 export const storeLot = (store: Store): Lot => lot(store.lotId);
+export const storeCity = (store: Store): CityDef => city(storeLot(store).cityId);
 export const storeDistrict = (store: Store): Neighborhood => neighborhood(storeLot(store).districtId);
 export function lotRent(lotId: string): Cents {
   const l = lot(lotId);
@@ -79,7 +84,12 @@ export function itemQuality(state: GameState, store: Store, item: MenuItem): num
     case 'pastry':
       return 1.0;
   }
-  return Math.max(0.5, base + grinderBonus - activeModifier(state, store, 'qualityPenalty', 0));
+  return Math.max(0.5, (base + grinderBonus - activeModifier(state, store, 'qualityPenalty', 0)) * beanQualityFactor(state));
+}
+
+// Beans from your own farms are used first; better beans than the market average make better coffee.
+export function beanQualityFactor(state: GameState): number {
+  return state.beans.kg >= 1 ? 1 + (state.beans.quality - MARKET_BEAN_QUALITY) * 0.6 : 1;
 }
 
 export function isWorking(staff: Staff, hour: number): boolean {
@@ -148,9 +158,20 @@ export const loanBalance = (state: GameState): Cents => -balances(state).loans;
 export const averageReputation = (state: GameState): number =>
   state.stores.reduce((sum, s) => sum + s.reputation, 0) / Math.max(1, state.stores.length);
 
-// The bank lends more to bigger, better-known companies.
+// The bank lends more to bigger, better-known companies, and a Finance department gets better terms.
 export const loanLimit = (state: GameState): Cents =>
-  dollars(30_000) + Math.max(0, Math.round(averageReputation(state) - 30)) * dollars(1_000) + (state.stores.length - 1) * dollars(15_000);
+  Math.round(
+    (dollars(30_000) + Math.max(0, Math.round(averageReputation(state) - 30)) * dollars(1_000) + (state.stores.length - 1) * dollars(15_000)) *
+      (1 + 0.15 * deptLevel(state, 'finance')),
+  );
+
+export const loanApr = (state: GameState): number => Math.max(0.02, LOAN_APR - 0.015 * deptLevel(state, 'finance'));
+
+export const repairCost = (state: GameState, typeId: string): Cents =>
+  Math.round(equipmentType(typeId).cost * REPAIR_RATE * (1 - 0.15 * deptLevel(state, 'engineering')));
+
+// What a barista asks for in this store's city.
+export const cityWage = (store: Store, askingWage: Cents): Cents => Math.round(askingWage * storeCity(store).rules.wageMultiplier);
 
 export const equipmentCount = (store: Store, typeId: string): number => store.equipment.filter((e) => e.typeId === typeId).length;
 

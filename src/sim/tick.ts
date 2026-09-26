@@ -1,4 +1,8 @@
-import { BANKRUPTCY_GRACE_WEEKS, HOURS_PER_WEEK, LOAN_APR, REPORTS_KEPT, UTILITIES_PER_OPEN_DAY, equipmentType } from './catalog';
+import { BANKRUPTCY_GRACE_WEEKS, HOURS_PER_WEEK, REPORTS_KEPT, UTILITIES_PER_OPEN_DAY, equipmentType } from './catalog';
+import { cityCharges } from './rules';
+import { HQ_WEEKLY_RENT, boardMeeting, deptLevel, hqWeeklyCost } from './hq';
+import { marketWeek, ownsBuilding, realEstateWeek, sharesWeek } from './markets';
+import { beanMarketWeek, harvestWeek } from './plantations';
 import { simulateHourSales } from './demand';
 import { autoResolveOverdue, maybeRollIncident } from './incidents';
 import { balanceSheet, cashFlow, foldJournal, incomeStatement, post, storeEntries } from './ledger';
@@ -7,7 +11,7 @@ import { managerMorning } from './manager';
 import { marketingAtmosphere, marketingBuzz, perCupCost, weeklyMarketingCost } from './marketing';
 import { formatMoney } from './money';
 import { rivalWeek } from './rival';
-import { ambianceMultiplier, averageReputation, isOpenHour, loanBalance, readiness, weeklyRent } from './store';
+import { ambianceMultiplier, averageReputation, isOpenHour, loanApr, loanBalance, readiness, storeCity, weeklyRent } from './store';
 import { refreshCandidates, updateMoraleAndQuits } from './staff';
 import { emptyDayStats, type GameState, type Store } from './state';
 
@@ -50,7 +54,8 @@ function runOpenHour(state: GameState, store: Store): void {
     [
       ['cash', sales.revenue - sales.cogs],
       ['salesRevenue', -sales.revenue],
-      ['cogs', sales.cogs],
+      ['cogs', sales.cogs + sales.inventoryCogs],
+      ['inventory', -sales.inventoryCogs],
     ],
     store.id,
   );
@@ -59,6 +64,7 @@ function runOpenHour(state: GameState, store: Store): void {
   today.revenue += sales.revenue;
   today.cogs += sales.cogs;
   today.marketingAccrued += sales.served * perCupCost(store);
+  today.feesAccrued += sales.drinks * storeCity(store).rules.cupFee;
   today.qualitySum += sales.qualitySum;
   today.priceRatioSum += sales.priceRatioSum;
   today.capacitySum += sales.capacity;
@@ -74,6 +80,7 @@ function endOfDayStore(state: GameState, store: Store): void {
   day.marketingAccrued += Math.round(weeklyMarketingCost(store) / 7);
   if (day.marketingAccrued > 0) post(state, 'Marketing', 'operating', [['marketing', day.marketingAccrued], ['cash', -day.marketingAccrued]], store.id);
   if (day.wagesAccrued > 0) post(state, 'Wages', 'operating', [['wages', day.wagesAccrued], ['cash', -day.wagesAccrued]], store.id);
+  if (day.feesAccrued > 0) post(state, `${storeCity(store).name} cup fee`, 'operating', [['otherExpense', day.feesAccrued], ['cash', -day.feesAccrued]], store.id);
   if (day.openHours > 0) {
     post(state, 'Utilities', 'operating', [['utilities', UTILITIES_PER_OPEN_DAY], ['cash', -UTILITIES_PER_OPEN_DAY]], store.id);
   }
@@ -97,7 +104,7 @@ function endOfDayStore(state: GameState, store: Store): void {
     const rep = store.reputation + (satisfaction - store.reputation) * 0.08 * volume;
     store.reputation = Math.round(Math.min(100, Math.max(0, rep)) * 100) / 100;
   }
-  store.reputation = Math.min(100, Math.round((store.reputation + marketingBuzz(store)) * 100) / 100);
+  store.reputation = Math.min(100, Math.round((store.reputation + marketingBuzz(store) + 0.03 * deptLevel(state, 'marketing')) * 100) / 100);
 
   updateMoraleAndQuits(state, store, day.capacitySum > 0 ? day.served / day.capacitySum : 0);
   store.yesterday = day;
@@ -107,8 +114,12 @@ function endOfDayStore(state: GameState, store: Store): void {
 function closeWeek(state: GameState): void {
   const weekNumber = state.hour / HOURS_PER_WEEK;
   for (const store of state.stores) {
-    const rent = weeklyRent(store);
-    post(state, 'Rent', 'operating', [['rent', rent], ['cash', -rent]], store.id);
+    // A store in a building you own pays no rent; the building's upkeep is charged with your real estate.
+    if (!ownsBuilding(state, store.lotId)) {
+      const rent = weeklyRent(store);
+      post(state, 'Rent', 'operating', [['rent', rent], ['cash', -rent]], store.id);
+    }
+    cityCharges(state, store);
     if (store.manager) post(state, `Salary for ${store.manager.name}`, 'operating', [['wages', store.manager.salary], ['cash', -store.manager.salary]], store.id);
     let depreciation = 0;
     for (const e of store.equipment) {
@@ -120,8 +131,18 @@ function closeWeek(state: GameState): void {
     post(state, 'Depreciation', 'operating', [['depreciation', depreciation], ['accumDepreciation', -depreciation]], store.id);
   }
 
-  const interest = Math.round((loanBalance(state) * LOAN_APR) / 52);
+  const interest = Math.round((loanBalance(state) * loanApr(state)) / 52);
   post(state, 'Loan interest', 'operating', [['interest', interest], ['cash', -interest]]);
+
+  if (state.hq.open) {
+    const payroll = hqWeeklyCost(state) - HQ_WEEKLY_RENT;
+    post(state, 'Headquarters rent', 'operating', [['rent', HQ_WEEKLY_RENT], ['cash', -HQ_WEEKLY_RENT]]);
+    post(state, 'Headquarters payroll', 'operating', [['wages', payroll], ['cash', -payroll]]);
+  }
+  harvestWeek(state);
+  realEstateWeek(state);
+  beanMarketWeek(state);
+  marketWeek(state);
 
   const income = incomeStatement(state.ledger.journal);
   const balance = balanceSheet(state);
@@ -140,6 +161,8 @@ function closeWeek(state: GameState): void {
     stores,
   });
   if (state.reports.length > REPORTS_KEPT) state.reports.splice(0, state.reports.length - REPORTS_KEPT);
+  boardMeeting(state, weekNumber);
+  sharesWeek(state, weekNumber);
   for (const s of state.stores) s.week = { served: 0, lost: 0 };
 
   // Insolvency is judged only on the ledger's cash, with a grace period before it is final.
