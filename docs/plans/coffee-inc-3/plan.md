@@ -10,6 +10,26 @@ Goals, in priority order:
 3. Add meaningfully new systems, not just more numbers.
 4. Ship as a proper Apple "Add to Home Screen" web app: installable, offline-capable, fast on WebKit/iOS Safari.
 
+## Decisions Log
+
+**2026-09-26 (owner review)**
+- MVP scope: **single store first** (Phase 1 below).
+- Art style: **keep Coffee Inc 2's look** (clean isometric cafe, warm materials, simple charming characters, dashboard-style finance screens).
+- Phase 2: owner delegated the choice. Chosen: **"Grow to a local chain"** (see Phase 2), because scaling past one store is the next thing a single-store player wants, and it forces the two systems Coffee Inc 2 got most wrong at scale (delegated managers and custom layouts) to be built right before anything bigger sits on top of them.
+
+**Defaults applied to the still-open questions** (easy to change later, none block the MVP):
+- Monetization: none in the MVP. Revisit before launch; no pay-to-win either way.
+- Save/sync: local-only (IndexedDB) plus JSON export/import. Account-based cloud save stays a later phase.
+- Devices: iPhone portrait first, layout also works on iPad and desktop Safari.
+- Timeline: none set.
+
+**Implementation simplifications for the MVP** (vs. the original architecture section):
+- One package, with `src/sim` kept framework-free (no React/DOM imports) instead of a monorepo. Same boundary, less tooling.
+- Money is **integer cents** guarded by `Number.isSafeInteger` (exact up to ~$90 trillion, throws loudly instead of losing precision). `decimal.js`/`BigInt` gets introduced with the stock market in Phase 3, where share counts actually need it.
+- Storage uses `idb-keyval` for the save blob; schema versioning and migrations live in the sim (`save.ts`), so the storage library stays swappable.
+- The store view uses plain Canvas 2D instead of PixiJS. One room with a few dozen shapes doesn't need WebGL, and Canvas 2D avoids iOS WebGL context loss when the app is backgrounded. PixiJS can come back for the Phase 2 city map if it's needed.
+- New companies start paused, so the clock doesn't run up rent while you read the setup checklist.
+
 ## Research Summary: Coffee Inc 2
 
 **Core systems** (source: App Store listing, MWM/Side Labs game pages, player guides):
@@ -124,13 +144,17 @@ Dependencies: 0.1, 0.3.
 **Task 1.3 — Offline/idle progress**: resume-time catch-up calculation with capped chunking.
 **Task 1.4 — Save/load + export**: wired to Phase 0 persistence, with the "back up your save" prompt.
 
-### Phase 2 — Delegation, Customization, Corporate Basics
-**Task 2.1 — Store manager FSM** (fixes bug #7): explicit states, self-healing invariant checks, UI indicator when a store needs attention.
-**Task 2.2 — Custom interior editor** (fixes bug #2): schema-validated layout, per-item error boundaries.
-**Task 2.3 — Multi-store + multi-city**: city unlock flow, per-city regional rules table (fixes bug #8).
-**Task 2.4 — HQ departments v1**: HR, Finance, Marketing (basic).
+### Phase 2 — Grow to a Local Chain (chosen 2026-09-26)
+**Task 2.1 — Store manager FSM** (fixes bug #7): hire a manager per store; explicit states (Staffing, Operating, Restocking, NeedsAttention), self-healing invariant checks every tick, UI badge when a store needs you.
+**Task 2.2 — Custom interior editor** (fixes bug #2): drag-to-place on the isometric grid, schema-validated layout, per-item error boundaries, layout affects flow and seating.
+**Task 2.3 — Multiple stores in the first city**: isometric city map with lots to lease, per-store P&L rolled up into company statements, store switcher.
+**Task 2.4 — Marketing basics**: local campaigns (flyers, social, loyalty card) with a measurable, honest effect on traffic.
+**Task 2.5 — One rival cafe chain** (pulled forward from Phase 4.1): a single AI competitor in the city that reacts to your prices, so growth has real tension.
 
-### Phase 3 — Plantations, Full Corporate Suite, Markets
+Moved to Phase 3: multi-city expansion with the per-city regional rules table (fixes bug #8), and HQ departments.
+
+### Phase 3 — Multi-City, Plantations, Full Corporate Suite, Markets
+**Task 3.0 — Multi-city expansion + HQ departments v1** (fixes bug #8): city unlock flow, config-driven per-city rules table, HR/Finance/Marketing departments.
 **Task 3.1 — Plantations & supply chain** (fixes bug #3): versioned region data bundles, fallback assets, retry/backoff loading, bundled offline-first.
 **Task 3.2 — Engineering/Executive/Investment departments**: C-level hiring, board meetings, dividends.
 **Task 3.3 — Stock market/IPO** (fixes bug #4): `decimal.js`-backed share math, unit-tested at extreme scale; real estate investing.
