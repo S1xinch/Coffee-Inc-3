@@ -154,10 +154,20 @@ export const DayStatsSchema = z.object({
   priceRatioSum: z.number(),
   capacitySum: z.number(),
   wagesAccrued: cents,
+  marketingAccrued: cents,
 });
+
+export const BRAND_ICONS = ['cup', 'bean', 'leaf', 'moon', 'wave', 'star'] as const;
+export type BrandIcon = (typeof BRAND_ICONS)[number];
+
+const rating = z.number().min(0).max(1);
 
 export const GameStateSchema = z.object({
   companyName: z.string().min(1).max(40),
+  brand: z.object({
+    icon: z.enum(BRAND_ICONS),
+    color: z.string().regex(/^#[0-9a-f]{6}$/i),
+  }),
   neighborhoodId: z.string(),
   hour: z.number().int().nonnegative(),
   rng: z.number().int().nonnegative(),
@@ -168,6 +178,9 @@ export const GameStateSchema = z.object({
     menu: z.record(z.string(), MenuEntrySchema),
     reputation: z.number().min(0).max(100),
     satisfaction: z.number().min(0).max(100),
+    ratings: z.object({ price: rating, product: rating, service: rating, atmosphere: rating }),
+    reviews: z.number().int().nonnegative(),
+    marketing: z.record(z.string(), z.number().int().nonnegative()),
   }),
   staff: z.array(StaffSchema),
   candidates: z.array(CandidateSchema),
@@ -225,4 +238,5 @@ export const emptyDayStats = (): DayStats => ({
   priceRatioSum: 0,
   capacitySum: 0,
   wagesAccrued: 0,
+  marketingAccrued: 0,
 });

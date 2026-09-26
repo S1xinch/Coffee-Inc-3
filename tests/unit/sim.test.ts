@@ -6,7 +6,8 @@ import { autoResolveOverdue, INCIDENTS } from '../../src/sim/incidents';
 import { balanceSheet, balances, cashBalance, ledgerIsBalanced, post } from '../../src/sim/ledger';
 import { offlineHours } from '../../src/sim/clock';
 import { makeSave, parseSave } from '../../src/sim/save';
-import { readiness } from '../../src/sim/store';
+import { readiness, starRating } from '../../src/sim/store';
+import { campaign } from '../../src/sim/marketing';
 import { advanceHours, advanceHoursInPlace } from '../../src/sim/tick';
 import { dollars } from '../../src/sim/money';
 import { openStore, run } from './helpers';
@@ -237,5 +238,79 @@ describe('offline progress', () => {
     expect(offlineHours(3_600_000)).toBe(24);
     expect(offlineHours(1000 * 3_600_000)).toBe(14 * 24);
     expect(offlineHours(Number.NaN)).toBe(0);
+  });
+});
+
+describe('reviews (Coffee Inc 2 review card)', () => {
+  it('builds up reviews and four sub-ratings from real service', () => {
+    const s = advanceHours(openStore(4), HOURS_PER_WEEK * 2);
+    expect(s.store.reviews).toBeGreaterThan(0);
+    for (const v of Object.values(s.store.ratings)) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+    const stars = starRating(s);
+    expect(stars).toBeGreaterThanOrEqual(1);
+    expect(stars).toBeLessThanOrEqual(5);
+  });
+
+  it('rates price lower when prices are high', () => {
+    const base = openStore(12);
+    let pricey = base;
+    for (const id of ['espresso', 'americano', 'latte', 'cappuccino', 'mocha', 'drip']) {
+      pricey = run(pricey, { type: 'setMenuItem', itemId: id, price: dollars(9) });
+    }
+    const a = advanceHours(base, HOURS_PER_WEEK);
+    const b = advanceHours(pricey, HOURS_PER_WEEK);
+    expect(b.store.ratings.price).toBeLessThan(a.store.ratings.price);
+  });
+});
+
+describe('marketing campaigns', () => {
+  it('charges each campaign weekly and books it as marketing expense', () => {
+    let s = openStore(8);
+    s = run(s, { type: 'setCampaign', campaignId: 'search', level: 1 }, { type: 'setCampaign', campaignId: 'sponsors', level: 2 });
+    s = advanceHours(s, HOURS_PER_WEEK - s.hour + HOURS_PER_WEEK);
+    const week2 = s.reports.at(-1)!;
+    const expected = campaign('search').levels[1]!.weeklyCost + campaign('sponsors').levels[2]!.weeklyCost;
+    expect(Math.abs(week2.income.marketing - expected)).toBeLessThanOrEqual(7);
+    expect(ledgerIsBalanced(s)).toBe(true);
+  });
+
+  it('brings in more customers when the team has room to serve them', () => {
+    const base = run(openStore(15), { type: 'hireStaff', candidateId: openStore(15).candidates[0]!.id });
+    const quiet = advanceHours(base, HOURS_PER_WEEK);
+    const loud = advanceHours(
+      run(base, { type: 'setCampaign', campaignId: 'search', level: 1 }, { type: 'setCampaign', campaignId: 'social', level: 1 }, { type: 'setCampaign', campaignId: 'mail', level: 1 }),
+      HOURS_PER_WEEK,
+    );
+    expect(loud.lifetime.served).toBeGreaterThan(quiet.lifetime.served);
+  });
+
+  it('rejects unknown campaigns and levels', () => {
+    const s = openStore();
+    expect(() => applyCommand(s, { type: 'setCampaign', campaignId: 'billboards', level: 1 })).toThrow();
+    expect(applyCommand(s, { type: 'setCampaign', campaignId: 'mail', level: 5 }).error).toBeDefined();
+  });
+});
+
+describe('save migration v1 to v2', () => {
+  it('upgrades a version 1 save with sensible defaults', () => {
+    const v2 = advanceHours(openStore(), 60);
+    const v1 = structuredClone(v2) as unknown as Record<string, any>;
+    delete v1.brand;
+    delete v1.store.ratings;
+    delete v1.store.reviews;
+    delete v1.store.marketing;
+    delete v1.today.marketingAccrued;
+    if (v1.yesterday) delete v1.yesterday.marketingAccrued;
+    const r = parseSave({ format: 'coffee-inc-3-save', version: 1, savedAtMs: 5, state: v1 });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.save.version).toBe(2);
+      expect(r.save.state.brand.icon).toBe('cup');
+      expect(r.save.state.store.marketing).toEqual({});
+      expect(r.save.state.today.marketingAccrued).toBe(0);
+    }
   });
 });

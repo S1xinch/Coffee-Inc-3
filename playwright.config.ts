@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const executablePath = process.env.PW_CHROMIUM_PATH || undefined;
+const basePath = process.env.GITHUB_PAGES === 'true' ? '/Coffee-Inc-3/' : '/';
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -8,7 +9,7 @@ export default defineConfig({
   fullyParallel: false,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: `http://localhost:4173${basePath}`,
     launchOptions: { executablePath },
     serviceWorkers: 'allow',
   },
@@ -18,7 +19,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run build && npx vite preview --port 4173 --strictPort',
-    url: 'http://localhost:4173',
+    url: `http://localhost:4173${basePath}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

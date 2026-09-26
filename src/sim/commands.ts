@@ -14,6 +14,7 @@ import {
   menuItem,
 } from './catalog';
 import { applyIncidentOption, incidentDef } from './incidents';
+import { campaign } from './marketing';
 import { cashBalance, post } from './ledger';
 import { addLog } from './log';
 import { formatMoney } from './money';
@@ -36,6 +37,7 @@ export type Command =
   | { type: 'takeLoan'; amount: number }
   | { type: 'repayLoan'; amount: number }
   | { type: 'setStoreOpen'; open: boolean }
+  | { type: 'setCampaign'; campaignId: string; level: number }
   | { type: 'ackReport'; week: number };
 
 export interface CommandResult {
@@ -174,6 +176,13 @@ function run(state: GameState, cmd: Command): void {
     case 'setStoreOpen': {
       state.store.open = cmd.open;
       addLog(state, 'info', cmd.open ? 'The store is open for business.' : 'The store is closed. Staff are not paid while closed.');
+      return;
+    }
+    case 'setCampaign': {
+      const c = campaign(cmd.campaignId);
+      const next = c.levels[cmd.level] ?? fail('Unknown campaign level.');
+      state.store.marketing[c.id] = cmd.level;
+      addLog(state, 'info', cmd.level === 0 ? `Stopped ${c.name}.` : `${c.name}: ${next.label}.`);
       return;
     }
     case 'ackReport': {

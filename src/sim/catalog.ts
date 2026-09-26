@@ -22,9 +22,12 @@ export const MAX_PRICE = dollars(20);
 export const REPORTS_KEPT = 52;
 export const LOG_KEPT = 60;
 
+export const CITY_NAME = 'Seattle';
+
 export interface Neighborhood {
   id: string;
   name: string;
+  address: string;
   blurb: string;
   trafficPerHour: number;
   weeklyRent: Cents;
@@ -35,6 +38,7 @@ export const NEIGHBORHOODS: readonly Neighborhood[] = [
   {
     id: 'old-town',
     name: 'Old Town',
+    address: '118 Cobble Lane',
     blurb: 'Quiet brick streets and loyal locals. Cheapest lease, slowest foot traffic.',
     trafficPerHour: 200,
     weeklyRent: dollars(1_100),
@@ -43,6 +47,7 @@ export const NEIGHBORHOODS: readonly Neighborhood[] = [
   {
     id: 'university',
     name: 'University District',
+    address: '4521 College Ave',
     blurb: 'Busy all day with students who watch every dollar.',
     trafficPerHour: 260,
     weeklyRent: dollars(1_500),
@@ -51,6 +56,7 @@ export const NEIGHBORHOODS: readonly Neighborhood[] = [
   {
     id: 'downtown',
     name: 'Downtown',
+    address: '700 Pine Street',
     blurb: 'Office crowds with big morning rushes. Premium lease.',
     trafficPerHour: 330,
     weeklyRent: dollars(3_000),
@@ -176,5 +182,7 @@ export const neighborhood = (id: string): Neighborhood => {
   if (!n) throw new Error(`Unknown neighborhood ${id}`);
   return n;
 };
+
+export const BRAND_COLORS = ['#2f6f8f', '#b4501a', '#2f7d4a', '#8a3b5c', '#c28a1e', '#3a4a8c'] as const;
 
 export const marketWage = (skill: number): Cents => dollars(14 + skill * 1.4);

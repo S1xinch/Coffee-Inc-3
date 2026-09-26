@@ -7,6 +7,7 @@ import {
   type MenuCategory,
   type MenuItem,
 } from './catalog';
+import { marketingTraffic } from './marketing';
 import { random } from './rng';
 import {
   ambianceMultiplier,
@@ -79,7 +80,8 @@ export function expectedVisitors(state: GameState): number {
     (TRAFFIC_CURVE[hourOfDay] ?? 0) *
     (DAY_TRAFFIC[dayIndex] ?? 1) *
     awareness *
-    trafficBoost(state)
+    trafficBoost(state) *
+    marketingTraffic(state)
   );
 }
 

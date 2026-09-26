@@ -97,6 +97,14 @@ export function readiness(state: GameState): Readiness {
   return { register, drinkMachine, barista, menu, ready: register && drinkMachine && barista && menu };
 }
 
+// Weighted like satisfaction: product matters most, then price and service, then the room.
+export function starRating(state: GameState): number {
+  const r = state.store.ratings;
+  return 1 + 4 * (0.3 * r.product + 0.25 * r.price + 0.25 * r.service + 0.2 * r.atmosphere);
+}
+
+export const ratingStars = (rating: number): number => 1 + 4 * rating;
+
 export const bookValue = (e: Equipment): Cents => e.cost - e.depreciated;
 
 export function disposeEquipment(state: GameState, e: Equipment, memo: string): Cents {

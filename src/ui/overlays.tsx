@@ -5,7 +5,7 @@ import type { ProgressSummary } from '../sim/summary';
 import { CloseIcon } from './Icons';
 import { Money, plural } from './bits';
 
-export function Modal({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose?: () => void; wide?: boolean }) {
+export function Modal({ title, children, onClose, wide = false, sheet = false }: { title: string; children: ReactNode; onClose?: () => void; wide?: boolean; sheet?: boolean }) {
   const id = useId();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -16,8 +16,8 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className={`dialog ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={id} ref={ref}>
+    <div className={`backdrop ${sheet ? 'sheet-backdrop' : ''}`} onClick={(e) => e.target === e.currentTarget && onClose?.()}>
+      <div className={`dialog ${wide ? 'wide' : ''} ${sheet ? 'sheet' : ''}`} role="dialog" aria-modal="true" aria-labelledby={id} ref={ref}>
         <header className="dialog-head">
           <h2 id={id}>{title}</h2>
           {onClose && (

@@ -25,6 +25,14 @@ export function clockInfo(hour: number): ClockInfo {
   };
 }
 
+// Day 1 of every company is Monday, January 5, 2026.
+const START_DATE_UTC = Date.UTC(2026, 0, 5);
+const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
+export function calendarDate(hour: number): string {
+  return dateFormat.format(new Date(START_DATE_UTC + Math.floor(hour / 24) * 86_400_000));
+}
+
 export function formatTime(hourOfDay: number, minutes = 0): string {
   const h12 = hourOfDay % 12 === 0 ? 12 : hourOfDay % 12;
   return `${h12}:${String(minutes).padStart(2, '0')} ${hourOfDay < 12 ? 'AM' : 'PM'}`;

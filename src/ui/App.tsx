@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NEIGHBORHOODS, STARTING_CAPITAL } from '../sim/catalog';
+import { BRAND_COLORS, NEIGHBORHOODS, STARTING_CAPITAL } from '../sim/catalog';
 import { clockInfo } from '../sim/clock';
 import { newGame } from '../sim/game';
 import { formatMoney } from '../sim/money';
@@ -8,6 +8,7 @@ import type { SceneModel } from '../render/scene';
 import { deleteSave, loadSave, readImportFile, requestPersistentStorage, writeSave } from '../persistence/storage';
 import { GameScreen } from './GameScreen';
 import { Logo } from './Icons';
+import { BrandPicker } from './Brand';
 import { FileButton } from './overlays';
 import { SceneCanvas } from './StoreView';
 
@@ -26,6 +27,7 @@ const DEMO_SCENE: SceneModel = {
   servedLastHour: 28,
   speed: 1,
   companyName: 'Coffee Inc 3',
+  brandColor: '#2f6f8f',
 };
 
 function isIosBrowser(): boolean {
@@ -35,10 +37,11 @@ function isIosBrowser(): boolean {
 }
 
 function Legal() {
+  const base = import.meta.env.BASE_URL;
   return (
     <p className="legal-links small">
-      <a href="/privacy.html">Privacy Policy</a>
-      <a href="/terms.html">Terms and Conditions</a>
+      <a href={`${base}privacy.html`}>Privacy Policy</a>
+      <a href={`${base}terms.html`}>Terms and Conditions</a>
     </p>
   );
 }
@@ -88,16 +91,17 @@ function Title({ existing, error, onContinue, onNew, onImport }: {
   );
 }
 
-function NewCompany({ hasExisting, onStart, onBack }: { hasExisting: boolean; onStart: (name: string, neighborhoodId: string) => void; onBack: () => void }) {
+function NewCompany({ hasExisting, onStart, onBack }: { hasExisting: boolean; onStart: (name: string, neighborhoodId: string, brand: GameState['brand']) => void; onBack: () => void }) {
   const [name, setName] = useState('');
   const [hood, setHood] = useState(NEIGHBORHOODS[0]!.id);
+  const [brand, setBrand] = useState<GameState['brand']>({ icon: 'cup', color: BRAND_COLORS[0] });
   return (
     <main className="newgame">
       <form
         className="newgame-card"
         onSubmit={(e) => {
           e.preventDefault();
-          onStart(name, hood);
+          onStart(name, hood, brand);
         }}
       >
         <h1>New company</h1>
@@ -108,6 +112,10 @@ function NewCompany({ hasExisting, onStart, onBack }: { hasExisting: boolean; on
           <span>Company name</span>
           <input value={name} maxLength={40} placeholder="Blue Door Coffee" onChange={(e) => setName(e.target.value)} autoComplete="off" />
         </label>
+        <fieldset className="hoods">
+          <legend>Logo</legend>
+          <BrandPicker value={brand} onChange={setBrand} />
+        </fieldset>
         <fieldset className="hoods">
           <legend>Where is your first store?</legend>
           {NEIGHBORHOODS.map((n) => (
@@ -179,8 +187,8 @@ export function App() {
         <NewCompany
           hasExisting={screen.hasExisting}
           onBack={() => loadSave().then((r) => setScreen({ kind: 'title', existing: r.kind === 'ok' ? { state: r.state, savedAtMs: r.savedAtMs } : null, error: null }))}
-          onStart={async (name, neighborhoodId) => {
-            const state = newGame({ companyName: name, neighborhoodId, seed: Math.floor(Math.random() * 2 ** 32) });
+          onStart={async (name, neighborhoodId, brand) => {
+            const state = newGame({ companyName: name, neighborhoodId, brand, seed: Math.floor(Math.random() * 2 ** 32) });
             await writeSave(state).catch(() => undefined);
             startGame(state, Date.now(), true);
           }}
