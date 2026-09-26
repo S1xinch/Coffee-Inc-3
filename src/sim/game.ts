@@ -1,5 +1,8 @@
 import { BRAND_COLORS, MENU, START_HOUR, STARTING_CAPITAL } from './catalog';
-import { firstLotIn } from './city';
+import { STARTING_CITY, firstLotIn } from './city';
+import { emptyHq } from './hq';
+import { newMarket, newShares, sharesWeek } from './markets';
+import { emptyBeans } from './plantations';
 import { post } from './ledger';
 import { addLog } from './log';
 import { newRival } from './rival';
@@ -55,12 +58,25 @@ export function newGame({ companyName, districtId, seed, brand }: NewGameOptions
     modifiers: [],
     log: [],
     rival: newRival(),
+    cities: [STARTING_CITY],
+    hq: emptyHq(),
+    board: { confidence: 50, targetRevenue: null, targetNetIncome: null, meetings: [] },
+    plantations: [],
+    beans: emptyBeans(),
+    market: newMarket(),
+    holdings: {},
+    properties: [],
+    shares: newShares(),
+    owner: { cash: 0 },
+    settings: { politics: true },
     lifetime: { served: 0, revenue: 0, incidentsAutoResolved: 0, staffQuit: 0 },
     lastSeenReportWeek: 0,
   };
   state.stores.push(createStore(state, first.id));
   post(state, 'Founder investment', 'financing', [['cash', STARTING_CAPITAL], ['ownerCapital', -STARTING_CAPITAL]]);
   refreshCandidates(state);
+  state.shares.price = 1;
+  sharesWeek(state, 0);
   state.hour = START_HOUR;
   state.stores[0]!.openedHour = START_HOUR;
   addLog(state, 'info', `Welcome to ${state.companyName}. Buy a register and an espresso machine, hire a barista, and open your doors.`);

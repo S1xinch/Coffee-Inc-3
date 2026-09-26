@@ -1,9 +1,12 @@
-import { BANKRUPTCY_GRACE_WEEKS, CLOSE_HOUR, OPEN_HOUR, REPAIR_RATE, equipmentType } from '../../sim/catalog';
+import { BANKRUPTCY_GRACE_WEEKS, CLOSE_HOUR, OPEN_HOUR, equipmentType } from '../../sim/catalog';
+import { deptLevel } from '../../sim/hq';
+import { formatMoney } from '../../sim/money';
+import { ownsBuilding, propertyDef, propertyValue, storeBuildingId } from '../../sim/markets';
 import { formatTime } from '../../sim/clock';
 import { incidentDef, incidentStaff } from '../../sim/incidents';
 import { lot } from '../../sim/city';
 import { managerStatus } from '../../sim/manager';
-import { isWorking, readiness, serviceCapacity, weeklyRent } from '../../sim/store';
+import { isWorking, readiness, repairCost, serviceCapacity, storeCity, weeklyRent } from '../../sim/store';
 import { Portrait } from '../Brand';
 import { AlertIcon, CheckIcon, CircleIcon } from '../Icons';
 import { Card, Money, Stat, plural, when } from '../bits';
@@ -38,13 +41,37 @@ function ManagerCard() {
 }
 
 function LocationCard() {
-  const { state, store, storeAct, confirm, selectStore } = useGameUi();
+  const { state, store, act, storeAct, confirm, selectStore } = useGameUi();
   const where = lot(store.lotId);
+  const rules = storeCity(store).rules;
+  const owned = ownsBuilding(state, store.lotId);
+  const building = propertyDef(storeBuildingId(store.lotId));
   return (
     <Card title="This location">
       <p className="muted small">
-        {where.address}. Rent is <Money cents={weeklyRent(store)} /> a week.
+        {where.address}, {storeCity(store).name}.{' '}
+        {owned ? (
+          'You own this building, so there is no rent.'
+        ) : (
+          <>
+            Rent is <Money cents={weeklyRent(store)} /> a week.
+          </>
+        )}
+        {rules.licenseFeeWeekly > 0 && (
+          <>
+            {' '}
+            Business license <Money cents={rules.licenseFeeWeekly} /> a week.
+          </>
+        )}
+        {rules.cupFee > 0 && <> The city charges {formatMoney(rules.cupFee, true)} for every cup.</>}
       </p>
+      {!owned && building && deptLevel(state, 'investment') >= 2 && (
+        <div className="row-actions">
+          <button className="btn btn-small" onClick={() => act({ type: 'buyProperty', propertyId: building.id })}>
+            Buy this building <Money cents={propertyValue(state, building)} />
+          </button>
+        </div>
+      )}
       {state.stores.length > 1 && (
         <div className="row-actions">
           <button
@@ -109,7 +136,7 @@ export function ServiceTab({ saveError }: { saveError: string | null }) {
             <AlertIcon />
             <span>The {t.name} is broken. Drinks that need it are off the menu.</span>
             <button className="btn btn-small btn-primary" onClick={() => storeAct({ type: 'repairEquipment', equipmentId: e.id })}>
-              Repair <Money cents={Math.round(t.cost * REPAIR_RATE)} />
+              Repair <Money cents={repairCost(state, e.typeId)} />
             </button>
           </div>
         );

@@ -155,6 +155,44 @@ test('moves furniture by tapping the floor', async ({ page }) => {
   await expect(page.getByText('Tap a gold square to pick it up')).toBeVisible();
 });
 
+test('opens headquarters and browses other cities', async ({ page }) => {
+  await startCompany(page, 'Big Plans');
+  await page.getByRole('button', { name: 'Back to the city map' }).click();
+  await pressHidden(page, /Lot for lease at 700 Pine Street/);
+  await page.getByRole('button', { name: /Lease this lot/ }).click();
+  await closeSheet(page);
+  await page.getByRole('button', { name: 'Back to the city map' }).click();
+
+  await page.getByRole('button', { name: /Choose a city/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Cities' })).toBeVisible();
+  await snap(page, '11-cities');
+  await page.locator('.city-card', { hasText: 'Portland' }).getByRole('button', { name: 'View map' }).click();
+  await expect(page.getByText('Portland is locked')).toBeVisible();
+  await snap(page, '12-portland');
+  await page.getByRole('button', { name: /Choose a city/ }).click();
+  await page.locator('.city-card', { hasText: 'San Francisco' }).getByRole('button', { name: 'View map' }).click();
+  await expect(page.getByText('San Francisco is locked')).toBeVisible();
+  await snap(page, '13-san-francisco');
+
+  await page.getByRole('button', { name: 'Headquarters', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Headquarters', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open headquarters' }).click();
+  await expect(page.getByRole('button', { name: 'Departments' })).toBeVisible();
+  await page.locator('.card', { hasText: 'Human Resources' }).getByRole('button', { name: /Build/ }).click();
+  await expect(page.locator('.card', { hasText: 'Human Resources' }).getByText('Level 1 of 3')).toBeVisible();
+  await snap(page, '14-hq-departments');
+  await page.getByRole('button', { name: 'Board' }).click();
+  await expect(page.getByText('Board of directors')).toBeVisible();
+  await page.getByRole('button', { name: 'Farms' }).click();
+  await expect(page.getByText('Yirgacheffe, Ethiopia')).toBeVisible();
+  await snap(page, '15-hq-farms');
+  await page.getByRole('button', { name: 'Investments' }).click();
+  await expect(page.getByText('Stock market')).toBeVisible();
+  await snap(page, '16-hq-investments');
+  await page.getByRole('button', { name: 'Back to the city map' }).click();
+  await expect(page.locator('.city-canvas')).toBeVisible();
+});
+
 test('shows a weekly report after the first week closes', async ({ page }) => {
   test.setTimeout(180_000);
   await startCompany(page, 'Report Test');

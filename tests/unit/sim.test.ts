@@ -5,7 +5,7 @@ import { newGame } from '../../src/sim/game';
 import { autoResolveOverdue, INCIDENTS } from '../../src/sim/incidents';
 import { balanceSheet, balances, cashBalance, ledgerIsBalanced, post } from '../../src/sim/ledger';
 import { offlineHours } from '../../src/sim/clock';
-import { makeSave, parseSave } from '../../src/sim/save';
+import { SAVE_VERSION, makeSave, parseSave } from '../../src/sim/save';
 import { readiness, starRating } from '../../src/sim/store';
 import { campaign } from '../../src/sim/marketing';
 import { advanceHours, advanceHoursInPlace } from '../../src/sim/tick';
@@ -309,7 +309,9 @@ function toV2(state: GameState): Record<string, any> {
   s.lastHour = store.lastHour;
   for (const k of ['id', 'lotId', 'openedHour', 'layout', 'staff', 'manager', 'today', 'yesterday', 'week', 'lastHour']) delete store[k];
   s.store = store;
-  for (const k of ['stores', 'rival']) delete s[k];
+  for (const k of ['stores', 'rival', 'cities', 'hq', 'board', 'plantations', 'beans', 'market', 'holdings', 'properties', 'shares', 'owner', 'settings']) delete s[k];
+  for (const r of s.reports) for (const k of ['inventory', 'farmland', 'investments', 'realEstate', 'shareCapital']) delete r.balance[k];
+  for (const d of [s.today, s.yesterday]) if (d) delete d.feesAccrued;
   for (const e of s.ledger.journal) delete e.storeId;
   for (const r of s.reports) delete r.stores;
   for (const i of s.incidents) delete i.storeId;
@@ -329,7 +331,7 @@ describe('save migrations', () => {
     const r = parseSave({ format: 'coffee-inc-3-save', version: 1, savedAtMs: 5, state: v1 });
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.save.version).toBe(3);
+      expect(r.save.version).toBe(SAVE_VERSION);
       expect(r.save.state.brand.icon).toBe('cup');
       expect(r.save.state.stores[0]!.marketing).toEqual({});
       expect(r.save.state.stores[0]!.today.marketingAccrued).toBe(0);

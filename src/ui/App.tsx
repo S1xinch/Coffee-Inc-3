@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { BRAND_COLORS, NEIGHBORHOODS, STARTING_CAPITAL } from '../sim/catalog';
+import { BRAND_COLORS, STARTING_CAPITAL, districtsIn } from '../sim/catalog';
+import { STARTING_CITY } from '../sim/city';
+
+const START_DISTRICTS = districtsIn(STARTING_CITY);
 import { firstLotIn } from '../sim/city';
 import { lotRent } from '../sim/store';
 import { clockInfo } from '../sim/clock';
@@ -95,7 +98,7 @@ function Title({ existing, error, onContinue, onNew, onImport }: {
 
 function NewCompany({ hasExisting, onStart, onBack }: { hasExisting: boolean; onStart: (name: string, districtId: string, brand: GameState['brand']) => void; onBack: () => void }) {
   const [name, setName] = useState('');
-  const [hood, setHood] = useState(NEIGHBORHOODS[0]!.id);
+  const [hood, setHood] = useState(START_DISTRICTS[0]!.id);
   const [brand, setBrand] = useState<GameState['brand']>({ icon: 'cup', color: BRAND_COLORS[0] });
   return (
     <main className="newgame">
@@ -121,7 +124,7 @@ function NewCompany({ hasExisting, onStart, onBack }: { hasExisting: boolean; on
         <fieldset className="hoods">
           <legend>Where is your first store?</legend>
           <p className="muted small">You can lease more lots in other districts later from the city map.</p>
-          {NEIGHBORHOODS.map((n) => (
+          {START_DISTRICTS.map((n) => (
             <label key={n.id} className={`hood ${hood === n.id ? 'on' : ''}`}>
               <input type="radio" name="hood" value={n.id} checked={hood === n.id} onChange={() => setHood(n.id)} />
               <span className="hood-name">{n.name}</span>

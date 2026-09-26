@@ -4,11 +4,14 @@ import { INCIDENTS } from './incidents';
 import { normalizeLayout } from './layout';
 import { ledgerIsBalanced } from './ledger';
 import { CAMPAIGNS } from './marketing';
+import { emptyHq } from './hq';
+import { newMarket, newShares } from './markets';
+import { emptyBeans } from './plantations';
 import { newRival } from './rival';
 import { GameStateSchema, type GameState } from './state';
 
 export const SAVE_FORMAT = 'coffee-inc-3-save';
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface SaveFile {
   format: typeof SAVE_FORMAT;
@@ -76,6 +79,22 @@ export const MIGRATIONS: Record<number, (state: RawState) => RawState> = {
       rival: newRival(),
     };
   },
+  // Version 4: cities, headquarters, plantations, markets, company shares, and the founder's own cash.
+  // New balance sheet lines and day-stat fields default to zero in the schema.
+  3: (s) => ({
+    ...s,
+    cities: ['seattle'],
+    hq: emptyHq(),
+    board: { confidence: 50, targetRevenue: null, targetNetIncome: null, meetings: [] },
+    plantations: [],
+    beans: emptyBeans(),
+    market: newMarket(),
+    holdings: {},
+    properties: [],
+    shares: newShares(),
+    owner: { cash: 0 },
+    settings: { politics: true },
+  }),
 };
 
 export const makeSave = (state: GameState, savedAtMs: number): SaveFile => ({
@@ -89,6 +108,9 @@ function semanticProblem(state: GameState): string | null {
   const lots = [...state.stores.map((s) => s.lotId), ...state.rival.stores.map((r) => r.lotId)];
   const badLot = lots.find((id) => !LOTS.some((l) => l.id === id));
   if (badLot) return `unknown lot "${badLot}"`;
+  const locked = state.stores.find((s) => !state.cities.includes(LOTS.find((l) => l.id === s.lotId)!.cityId));
+  if (locked) return 'a store in a city that is not unlocked';
+  if (BigInt(state.shares.owner) > BigInt(state.shares.total) || BigInt(state.shares.total) === 0n) return 'impossible share counts';
   if (new Set(lots).size !== lots.length) return 'two stores on the same lot';
   if (new Set(state.stores.map((s) => s.id)).size !== state.stores.length) return 'duplicate store ids';
   for (const store of state.stores) {

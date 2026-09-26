@@ -34,6 +34,17 @@ Goals, in priority order:
 - Incidents only happen at stores that are ready to open, so a new empty store doesn't get pop-ups.
 - Save format moves to version 3 (one store becomes a list of stores on lots, plus the rival), with a migration from version 2.
 
+**2026-09-26 (owner): "run all of phase 3"**
+- Phase 3 is built in four parts, each with its own tests.
+- Cities (Task 3.0): Portland and San Francisco join Seattle, each with its own map, districts, lots, and landmark. Portland needs 2 stores and $20,000 to unlock; San Francisco needs 4 stores and $45,000. The rival chain can expand into any city you have unlocked.
+- City rules table (fixes bug #8): every city-specific charge lives in one table (wage multiplier, per-cup fee, weekly business license, fines) and is applied by one function (`src/sim/rules.ts`). A single "local politics" setting turns fines off everywhere; licenses and cup fees are laws and always apply. A test runs 300 weeks of charges with politics off and checks that no fine is ever posted.
+- Headquarters (Tasks 3.0 and 3.2): opens with 2 stores for $12,000 plus $1,500 a week. Six departments (HR, Finance, Marketing, Engineering, Executive Office, Investment), each with three levels, a weekly budget, and a stated effect on the rest of the game. A chief for each department adds one level; chiefs other than the CEO need the Executive Office. The board meets every 13 weeks, compares the quarter to the targets it set last time, and moves its confidence, which feeds the share price once the company is public.
+- Plantations (Task 3.1, fixes bug #3): seven growing regions ship as versioned data bundles checked against a schema. A damaged or unknown region falls back to a safe default instead of failing, and the region art is drawn only from validated colors. Farms harvest weekly into a bean warehouse kept at cost on the balance sheet. Stores use house beans first; better beans raise drink quality, and the rest are bought at a bean market price that moves weekly.
+- Markets (Task 3.3, fixes bug #4): share counts are exact whole numbers held as BigInt, so splits can take them past a quadrillion without losing precision. Amounts too large to handle are refused with a message instead of crashing. There is an IPO (sell 10 to 40 percent), 2-for-1 splits, dividends out of retained earnings, selling part of your own stake, fictional listed stocks (the rival among them), and real estate, including buying the building a store sits in to end its rent.
+- Personal wealth is kept apart from the company's money, as in Coffee Inc 2: dividends and share sales move money to the founder.
+- New ledger accounts: bean inventory, farmland, stock investments, real estate, share capital, and dividends. Save format moves to version 4, with a migration from version 3.
+- Headquarters gets its own slate-blue theme, the way Coffee Inc 2 themes each location.
+
 **Defaults applied to the still-open questions** (easy to change later, none block the MVP):
 - Monetization: none in the MVP. Revisit before launch; no pay-to-win either way.
 - Save/sync: local-only (IndexedDB) plus JSON export/import. Account-based cloud save stays a later phase.
@@ -170,7 +181,7 @@ Dependencies: 0.1, 0.3.
 
 Moved to Phase 3: multi-city expansion with the per-city regional rules table (fixes bug #8), and HQ departments.
 
-### Phase 3 — Multi-City, Plantations, Full Corporate Suite, Markets
+### Phase 3 — Multi-City, Plantations, Full Corporate Suite, Markets (built 2026-09-26)
 **Task 3.0 — Multi-city expansion + HQ departments v1** (fixes bug #8): city unlock flow, config-driven per-city rules table, HR/Finance/Marketing departments.
 **Task 3.1 — Plantations & supply chain** (fixes bug #3): versioned region data bundles, fallback assets, retry/backoff loading, bundled offline-first.
 **Task 3.2 — Engineering/Executive/Investment departments**: C-level hiring, board meetings, dividends.

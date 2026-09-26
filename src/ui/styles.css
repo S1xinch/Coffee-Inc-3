@@ -1742,3 +1742,178 @@ table.fin tr.strong td {
 .share-legend .swatch-dot {
   vertical-align: -1px;
 }
+
+/* Phase 3: headquarters (slate blue, like Coffee Inc 2's HQ screens), cities, farms, markets */
+.hq-screen {
+  --bg: #1f2a35;
+  --bg-stripe: #22303c;
+  --header: #151d25;
+  --surface-solid: #2a3846;
+  --accent: #2f6a8c;
+  --accent-edge: #4d8fb5;
+  --seg: #3f5566;
+  --seg-on: #2b3a47;
+  background: repeating-linear-gradient(90deg, var(--bg) 0 8px, var(--bg-stripe) 8px 16px);
+  background-color: var(--bg);
+}
+
+.hq-screen .btn-primary:hover {
+  background: #3a7aa0;
+  border-color: #5e9fc4;
+}
+
+.hq-speed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.hq-panel {
+  padding-bottom: 24px;
+}
+
+.exec-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.exec-row > div,
+.exec-row > .muted {
+  flex: 1;
+  min-width: 0;
+}
+
+.farm-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.region-art {
+  display: block;
+  flex: none;
+  border-radius: 8px;
+}
+
+.region-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.region-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.region-card h3 {
+  font-size: 16px;
+}
+
+.region-card .region-art {
+  width: 100%;
+  height: 96px;
+}
+
+.region-card .btn {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.stock-symbol {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-actions.compact {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.city-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.city-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.city-card.on {
+  border-color: var(--accent-edge);
+}
+
+.city-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+}
+
+.city-locked {
+  position: absolute;
+  left: 50%;
+  bottom: calc(84px + var(--safe-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(320px, calc(100% - 32px));
+  padding: 12px 14px;
+  border: 1.5px solid var(--chip-edge);
+  border-radius: var(--radius);
+  background: var(--chip);
+  color: #fff;
+  text-align: center;
+}
+
+button.city-chip {
+  border: 1.5px solid var(--chip-edge);
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (max-width: 420px) {
+  .city-chip {
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+
+  .city-bar .speed button {
+    width: 34px;
+  }
+}
+
+.hq-screen .store-body {
+  display: block;
+}
+
+.hq-screen .store-panel.hq-panel {
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}

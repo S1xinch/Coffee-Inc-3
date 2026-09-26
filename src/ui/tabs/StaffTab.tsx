@@ -1,6 +1,6 @@
 import { MANAGER_SALARY, MAX_STAFF, RAISE_STEP, RECRUITING_COST, TRAINING_COST, equipmentType, marketWage } from '../../sim/catalog';
 import { managerStatus } from '../../sim/manager';
-import { baristaRate, serviceCapacity, workingEquipment } from '../../sim/store';
+import { baristaRate, cityWage, serviceCapacity, workingEquipment } from '../../sim/store';
 import { Portrait } from '../Brand';
 import { Card, Meter, Money, when } from '../bits';
 import { useGameUi } from '../context';
@@ -137,7 +137,7 @@ export function StaffTab() {
               <div className="person-head">
                 <strong>{c.name}</strong>
                 <span className="num">
-                  <Money cents={c.askingWage} withCents />/h
+                  <Money cents={cityWage(store, c.askingWage)} withCents />/h
                 </span>
               </div>
               <div className="meter-row">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HOURS_PER_WEEK, MANAGER_SALARY, NEIGHBORHOODS } from '../../src/sim/catalog';
-import { CITY_H, CITY_W, LOTS, PIERS, firstLotIn, isRoad, isWater, zoneAt } from '../../src/sim/city';
+import { CITIES, LOTS, city, firstLotIn, isRoad, isWater, zoneAt } from '../../src/sim/city';
 import { applyCommand } from '../../src/sim/commands';
 import { newGame } from '../../src/sim/game';
 import { cashBalance, ledgerIsBalanced, post, storeEntries } from '../../src/sim/ledger';
@@ -12,26 +12,34 @@ import { advanceHours } from '../../src/sim/tick';
 import { openStore, run } from './helpers';
 
 const freeLot = (s: ReturnType<typeof openStore>, districtId?: string) =>
-  LOTS.find((l) => !lotTaken(s, l.id) && (!districtId || l.districtId === districtId))!;
+  LOTS.find((l) => s.cities.includes(l.cityId) && !lotTaken(s, l.id) && (!districtId || l.districtId === districtId))!;
 
-describe('city map', () => {
+describe('city maps', () => {
   it('puts every lot on dry land, off the roads, in its own district', () => {
     const seen = new Set<string>();
     for (const l of LOTS) {
+      const c = city(l.cityId);
       expect(l.x).toBeGreaterThanOrEqual(0);
-      expect(l.x).toBeLessThan(CITY_W);
-      expect(l.y).toBeLessThan(CITY_H);
-      expect(isWater(l.x, l.y)).toBe(false);
-      expect(isRoad(l.x, l.y)).toBe(false);
-      expect(zoneAt(l.x, l.y)).toBe(l.districtId);
-      expect(seen.has(`${l.x},${l.y}`)).toBe(false);
-      seen.add(`${l.x},${l.y}`);
+      expect(l.x).toBeLessThan(c.w);
+      expect(l.y).toBeLessThan(c.h);
+      expect(isWater(c, l.x, l.y)).toBe(false);
+      expect(isRoad(c, l.x, l.y)).toBe(false);
+      expect(zoneAt(c, l.x, l.y)).toBe(l.districtId);
+      expect(seen.has(`${l.cityId}:${l.x},${l.y}`)).toBe(false);
+      seen.add(`${l.cityId}:${l.x},${l.y}`);
     }
   });
 
-  it('has lots in all six districts and piers reaching into the bay', () => {
-    for (const n of NEIGHBORHOODS) expect(LOTS.some((l) => l.districtId === n.id)).toBe(true);
-    for (const p of PIERS) expect(isWater(p.x, p.to)).toBe(true);
+  it('has lots in every district and piers reaching into the water', () => {
+    for (const n of NEIGHBORHOODS) expect(LOTS.some((l) => l.districtId === n.id && l.cityId === n.cityId)).toBe(true);
+    for (const c of CITIES) {
+      for (const p of c.piers) {
+        const tiles = [];
+        for (let x = Math.floor(p.x0); x <= Math.floor(p.x1); x++) for (let y = Math.floor(p.y0); y <= Math.floor(p.y1); y++) tiles.push(isWater(c, x, y));
+        expect(tiles).toContain(true);
+        expect(tiles).toContain(false);
+      }
+    }
   });
 });
 

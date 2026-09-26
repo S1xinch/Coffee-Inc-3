@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CITY_NAME, LEASE_SIGNING_WEEKS, neighborhood } from '../sim/catalog';
-import { LOTS, lot as lotById } from '../sim/city';
+import { LEASE_SIGNING_WEEKS, neighborhood } from '../sim/catalog';
+import { CITIES, city as cityById, lot as lotById, lotsIn } from '../sim/city';
 import type { Command, StoreCommand } from '../sim/commands';
 import { calendarDate, clockInfo, formatTime, type Speed } from '../sim/clock';
 import { incidentDef, incidentStaff } from '../sim/incidents';
@@ -12,11 +12,12 @@ import { lotRent, storeById } from '../sim/store';
 import { exportSave, readImportFile } from '../persistence/storage';
 import { BrandMark, Portrait } from './Brand';
 import { CityView } from './CityView';
-import { Money } from './bits';
+import { Money, plural } from './bits';
 import { GameUiContext, type GameUi, type SheetId, type TabId } from './context';
 import { AwayModal, CatchUpOverlay, ConfirmModal, FileButton, Modal, Toast, WeekReportModal, type ConfirmRequest } from './overlays';
 import { readPref, writePref } from './prefs';
 import { SpeedControls, StoreScreen } from './StoreScreen';
+import { HqScreen } from './HqScreen';
 import { BuildTab } from './tabs/BuildTab';
 import { StaffTab } from './tabs/StaffTab';
 import { useGame, useProgress, type ProgressStore } from './useGame';
@@ -34,6 +35,13 @@ function DateChip({ hour, progress }: { hour: number; progress: ProgressStore })
     </div>
   );
 }
+
+const HqIcon = () => (
+  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 21V5l8-3 8 3v16" />
+    <path d="M9 21v-4h6v4M8 8h2M14 8h2M8 12h2M14 12h2" />
+  </svg>
+);
 
 const MenuIcon = () => (
   <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
@@ -103,7 +111,9 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
     game.stopSaving();
     startOver();
   };
-  const [view, setView] = useState<'city' | 'store'>(startPaused ? 'store' : 'city');
+  const [view, setView] = useState<'city' | 'store' | 'hq'>(startPaused ? 'store' : 'city');
+  const [cityId, setCityId] = useState<string | null>(null);
+  const [citiesOpen, setCitiesOpen] = useState(false);
   const [tab, setTab] = useState<TabId>('service');
   const [sheet, setSheet] = useState<SheetId | null>(null);
   const [lot, setLot] = useState<string | null>(null);
@@ -155,6 +165,8 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
     () => (state && store ? { state, store, act, storeAct, selectStore: setStoreId, goTo, openSheet: setSheet, confirm } : null),
     [state, store, act, storeAct, goTo, confirm],
   );
+  // The map shows the city picked in the Cities sheet, or else the current store's city.
+  const viewCity = cityId ?? (store ? lotById(store.lotId).cityId : 'seattle');
   const openStore = useCallback((id: string) => {
     setStoreId(id);
     setView('store');
@@ -251,38 +263,125 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
 
         {view === 'city' ? (
           <main className="city">
-            <CityView state={state} focusLotId={ui.store.lotId} onOpenStore={openStore} onLot={setLot} onRival={setRivalLot} />
+            <CityView
+              state={state}
+              cityId={viewCity}
+              focusLotId={lotById(ui.store.lotId).cityId === viewCity ? ui.store.lotId : (state.stores.find((s) => lotById(s.lotId).cityId === viewCity)?.lotId ?? '')}
+              onOpenStore={openStore}
+              onLot={setLot}
+              onRival={setRivalLot}
+            />
+            {!state.cities.includes(viewCity as (typeof state.cities)[number]) && (
+              <div className="city-locked">
+                <strong>{cityById(viewCity).name} is locked</strong>
+                <span className="small">Unlock it from the Cities list to lease lots here.</span>
+                <button className="btn btn-small btn-primary" onClick={() => setCitiesOpen(true)}>
+                  Cities
+                </button>
+              </div>
+            )}
             <div className="sr-only-list">
-              {state.stores.map((s) => (
+              {state.stores.filter((s) => lotById(s.lotId).cityId === viewCity).map((s) => (
                 <button key={s.id} onClick={() => openStore(s.id)}>
                   Open your store at {lotById(s.lotId).address}
                 </button>
               ))}
-              {LOTS.filter((l) => !lotTaken(state, l.id)).map((l) => (
+              {lotsIn(viewCity).filter((l) => state.cities.includes(l.cityId) && !lotTaken(state, l.id)).map((l) => (
                 <button key={l.id} onClick={() => setLot(l.id)}>
                   Lot for lease at {l.address}, {neighborhood(l.districtId).name}
                 </button>
               ))}
-              {state.rival.stores.map((r) => (
+              {state.rival.stores.filter((r) => lotById(r.lotId).cityId === viewCity).map((r) => (
                 <button key={r.lotId} onClick={() => setRivalLot(r.lotId)}>
                   {state.rival.name} at {lotById(r.lotId).address}
                 </button>
               ))}
             </div>
             <div className="city-bar">
-              <div className="chip city-chip">
+              <button className="chip city-chip" aria-label={`${cityById(viewCity).name}. Choose a city.`} onClick={() => setCitiesOpen(true)}>
                 <PinIcon />
-                <span>{CITY_NAME}</span>
-              </div>
+                <span>{cityById(viewCity).name}</span>
+              </button>
               <SpeedControls speed={game.speed} onChange={setSpeed} />
+              <button className="round-btn" aria-label="Headquarters" onClick={() => setView('hq')}>
+                <HqIcon />
+              </button>
               <button className="round-btn" aria-label="Menu" onClick={() => setMenuOpen(true)}>
                 <MenuIcon />
               </button>
             </div>
             <p className="city-hint">Tap a pin to open it</p>
           </main>
+        ) : view === 'hq' ? (
+          <HqScreen speed={game.speed} onSpeed={setSpeed} onClose={() => setView('city')} />
         ) : (
-          <StoreScreen tab={tab} onTab={setTab} speed={game.speed} onSpeed={setSpeed} onClose={() => setView('city')} saveError={game.saveError} />
+          <StoreScreen
+            tab={tab}
+            onTab={setTab}
+            speed={game.speed}
+            onSpeed={setSpeed}
+            onClose={() => {
+              setCityId(null);
+              setView('city');
+            }}
+            saveError={game.saveError}
+          />
+        )}
+
+        {citiesOpen && (
+          <Modal title="Cities" onClose={() => setCitiesOpen(false)}>
+            <ul className="city-list">
+              {CITIES.map((c) => {
+                const unlocked = state.cities.includes(c.id);
+                const count = state.stores.filter((s) => lotById(s.lotId).cityId === c.id).length;
+                const r = c.rules;
+                return (
+                  <li key={c.id} className={`city-card ${viewCity === c.id ? 'on' : ''}`}>
+                    <div className="city-card-head">
+                      <strong>{c.name}</strong>
+                      <span className={`tag ${unlocked ? 'good' : ''}`}>{unlocked ? plural(count, 'store') : 'Locked'}</span>
+                    </div>
+                    <p className="muted small">{c.blurb}</p>
+                    <p className="small">
+                      Wages {r.wageMultiplier === 1 ? 'normal' : `${r.wageMultiplier > 1 ? '+' : ''}${Math.round((r.wageMultiplier - 1) * 100)}%`}
+                      {r.cupFee > 0 && ` · ${formatMoney(r.cupFee, true)} fee per cup`}
+                      {r.licenseFeeWeekly > 0 && ` · ${formatMoney(r.licenseFeeWeekly)} a week business license`}
+                      {r.fines.length > 0 && ` · fines for ${r.fines.map((f) => f.name.toLowerCase()).join(' and ')}`}
+                    </p>
+                    <div className="row-actions">
+                      <button
+                        className="btn btn-small"
+                        onClick={() => {
+                          setCityId(c.id);
+                          setCitiesOpen(false);
+                          setView('city');
+                        }}
+                      >
+                        View map
+                      </button>
+                      {!unlocked && c.unlock && (
+                        <button
+                          className="btn btn-small btn-primary"
+                          onClick={async () => {
+                            if (await act({ type: 'unlockCity', cityId: c.id })) {
+                              setCityId(c.id);
+                              setCitiesOpen(false);
+                              setView('city');
+                            }
+                          }}
+                        >
+                          Unlock <Money cents={c.unlock.fee} />
+                        </button>
+                      )}
+                    </div>
+                    {!unlocked && c.unlock && state.stores.length < c.unlock.minStores && (
+                      <p className="muted small">Needs {plural(c.unlock.minStores, 'store')}. You run {state.stores.length}.</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </Modal>
         )}
 
         {sheet && (
@@ -357,7 +456,7 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
               {lotById(rivalLot).address}, {neighborhood(lotById(rivalLot).districtId).name}
             </p>
             <p>
-              A rival chain with {state.rival.stores.length} stores in {CITY_NAME}. Customers here rate them {state.rival.stars.toFixed(1)} stars, and their prices are about{' '}
+              A rival chain with {state.rival.stores.length} stores. Customers here rate them {state.rival.stars.toFixed(1)} stars, and their prices are about{' '}
               {Math.round(state.rival.priceIndex * 100)}% of the typical menu. They cut prices when yours are high and open a new store every few weeks.
             </p>
             <p className="muted small">A store in the same district as theirs shares its walk-ins with them. Better ratings and fair prices win more of them.</p>
@@ -428,6 +527,10 @@ export function GameScreen({ initial, savedAtMs, startPaused, onImported, onNewC
                 }}
               />
               <span>Pause when a week ends</span>
+            </label>
+            <label className="setting">
+              <input type="checkbox" checked={state.settings.politics} onChange={(e) => act({ type: 'setPolitics', on: e.target.checked })} />
+              <span>Local politics: cities can fine your stores</span>
             </label>
             <h3 className="setting-head">Your save</h3>
             <p className="muted small">
