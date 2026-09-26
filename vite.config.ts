@@ -6,7 +6,10 @@ import { readFileSync } from 'node:fs';
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
+const base = process.env.GITHUB_PAGES === 'true' ? '/Coffee-Inc-3/' : '/';
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -18,8 +21,8 @@ export default defineConfig({
         short_name: 'Coffee Inc 3',
         description: 'Run a coffee shop and grow it into a coffee company.',
         lang: 'en',
-        start_url: '/',
-        scope: '/',
+        start_url: base,
+        scope: base,
         display: 'standalone',
         orientation: 'any',
         background_color: '#f4ede3',
